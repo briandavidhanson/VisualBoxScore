@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Boxscores</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.85;
+        }
+        
+        main {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        /* Month Button */
+        .month-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            font-size: 1.3rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .month-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .month-btn .arrow {
+            transition: transform 0.3s;
+        }
+        
+        .month-btn.open .arrow {
+            transform: rotate(90deg);
+        }
+        
+        /* Month Content */
+        .month-content {
+            display: none;
+            padding: 0.5rem 0 1rem 1rem;
+        }
+        
+        .month-content.open {
+            display: block;
+        }
+        
+        /* Date Button */
+        .date-btn {
+            width: 100%;
+            background: white;
+            color: #16213e;
+            border: 2px solid #16213e;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.4rem;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        
+        .date-btn:hover {
+            background-color: #f0f4ff;
+        }
+        
+        .date-btn .arrow {
+            transition: transform 0.3s;
+            color: #16213e;
+        }
+        
+        .date-btn.open .arrow {
+            transform: rotate(90deg);
+        }
+        
+        .date-btn .game-count {
+            font-size: 0.85rem;
+            font-weight: normal;
+            color: #666;
+            margin-left: 0.5rem;
+        }
+        
+        /* Date Content (Games List) */
+        .date-content {
+            display: none;
+            padding: 0.5rem 0 0.75rem 1rem;
+        }
+        
+        .date-content.open {
+            display: block;
+        }
+        
+        .games-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .game-card {
+            background: white;
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            text-decoration: none;
+            color: #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .game-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .matchup {
+            font-size: 1rem;
+        }
+        
+        .team {
+            font-weight: 600;
+        }
+        
+        .score {
+            color: #666;
+            margin: 0 0.15rem;
+        }
+        
+        .at {
+            color: #999;
+            margin: 0 0.25rem;
+        }
+        
+        .winner {
+            color: #2e7d32;
+        }
+        
+        .loser {
+            color: #888;
+        }
+        
+        .game-card .view-arrow {
+            color: #999;
+            font-size: 1.1rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🏀 Visual Boxscores</h1>
+        <p>Every possession tells a story</p>
+    </header>
+    
+    <main>
+        
+        <!-- January 2026 -->
+        <div class="month-section">
+            <button class="month-btn" onclick="toggleMonth(this)">
+                <span>January 2026</span>
+                <span class="arrow">▶</span>
+            </button>
+            <div class="month-content">
+                
+                <!-- January 22, 2026 -->
+                <div class="date-section">
+                    <button class="date-btn" onclick="toggleDate(this)">
+                        <span>January 22 <span class="game-count">(8 games)</span></span>
+                        <span class="arrow">▶</span>
+                    </button>
+                    <div class="date-content">
+                        <div class="games-list">
+                            
+                            <a href="202601220DAL.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team loser">Golden State Warriors</span>
+                                    <span class="score">115</span>
+                                    <span class="at">@</span>
+                                    <span class="team winner">Dallas Mavericks</span>
+                                    <span class="score">123</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220LAC.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team loser">Los Angeles Lakers</span>
+                                    <span class="score">104</span>
+                                    <span class="at">@</span>
+                                    <span class="team winner">Los Angeles Clippers</span>
+                                    <span class="score">112</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220MIN.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Chicago Bulls</span>
+                                    <span class="score">120</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Minnesota Timberwolves</span>
+                                    <span class="score">115</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220ORL.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Charlotte Hornets</span>
+                                    <span class="score">124</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Orlando Magic</span>
+                                    <span class="score">97</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220PHI.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team loser">Houston Rockets</span>
+                                    <span class="score">122</span>
+                                    <span class="at">@</span>
+                                    <span class="team winner">Philadelphia 76ers</span>
+                                    <span class="score">128</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220POR.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team loser">Miami Heat</span>
+                                    <span class="score">110</span>
+                                    <span class="at">@</span>
+                                    <span class="team winner">Portland Trail Blazers</span>
+                                    <span class="score">127</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220UTA.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">San Antonio Spurs</span>
+                                    <span class="score">126</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Utah Jazz</span>
+                                    <span class="score">109</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601220WAS.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Denver Nuggets</span>
+                                    <span class="score">107</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Washington Wizards</span>
+                                    <span class="score">97</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- January 21, 2026 -->
+                <div class="date-section">
+                    <button class="date-btn" onclick="toggleDate(this)">
+                        <span>January 21 <span class="game-count">(7 games)</span></span>
+                        <span class="arrow">▶</span>
+                    </button>
+                    <div class="date-content">
+                        <div class="games-list">
+                            
+                            <a href="202601210BOS.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team loser">Indiana Pacers</span>
+                                    <span class="score">104</span>
+                                    <span class="at">@</span>
+                                    <span class="team winner">Boston Celtics</span>
+                                    <span class="score">119</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601210CHO.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Cleveland Cavaliers</span>
+                                    <span class="score">94</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Charlotte Hornets</span>
+                                    <span class="score">87</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601210MEM.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Atlanta Hawks</span>
+                                    <span class="score">124</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Memphis Grizzlies</span>
+                                    <span class="score">122</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601210MIL.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Oklahoma City Thunder</span>
+                                    <span class="score">122</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Milwaukee Bucks</span>
+                                    <span class="score">102</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601210NOP.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Detroit Pistons</span>
+                                    <span class="score">112</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">New Orleans Pelicans</span>
+                                    <span class="score">104</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601210NYK.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team loser">Brooklyn Nets</span>
+                                    <span class="score">66</span>
+                                    <span class="at">@</span>
+                                    <span class="team winner">New York Knicks</span>
+                                    <span class="score">120</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                            <a href="202601210SAC.html" class="game-card">
+                                <div class="matchup">
+                                    <span class="team winner">Toronto Raptors</span>
+                                    <span class="score">122</span>
+                                    <span class="at">@</span>
+                                    <span class="team loser">Sacramento Kings</span>
+                                    <span class="score">109</span>
+                                </div>
+                                <span class="view-arrow">→</span>
+                            </a>
+                            
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+    </main>
+    
+    <footer>
+        <p>Visual Boxscores — Beyond the box score</p>
+    </footer>
+    
+    <script>
+        function toggleMonth(btn) {
+            btn.classList.toggle('open');
+            const content = btn.nextElementSibling;
+            content.classList.toggle('open');
+        }
+        
+        function toggleDate(btn) {
+            btn.classList.toggle('open');
+            const content = btn.nextElementSibling;
+            content.classList.toggle('open');
+        }
+    </script>
+</body>
+</html>
