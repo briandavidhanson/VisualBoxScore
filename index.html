@@ -41,6 +41,9 @@
         .winner { color: #2e7d32; }
         .loser { color: #888; }
         .game-card .view-arrow { color: #999; font-size: 1.1rem; }
+        .format-links { display: flex; gap: 0.5rem; }
+        .format-link { padding: 0.3rem 0.6rem; font-size: 0.8rem; font-weight: 600; text-decoration: none; border-radius: 4px; border: 1px solid #16213e; color: #16213e; transition: all 0.2s; }
+        .format-link:hover { background: #16213e; color: white; }
         .game-date { font-size: 0.85rem; color: #666; margin-right: 0.75rem; }
         footer { text-align: center; padding: 2rem; color: #666; font-size: 0.9rem; }
     </style>
@@ -115,7 +118,7 @@ const games = [
 function gameCard(g, showDate=false) {
     const awayWon = g.asc > g.hsc;
     const dateStr = showDate ? `<span class="game-date">${g.date}</span>` : '';
-    return `<a href="${g.id}.html" class="game-card">${dateStr}<div class="matchup"><span class="team ${awayWon?'winner':'loser'}">${g.away}</span><span class="score">${g.asc}</span><span class="at">@</span><span class="team ${awayWon?'loser':'winner'}">${g.home}</span><span class="score">${g.hsc}</span></div><span class="view-arrow">→</span></a>`;
+    return `<div class="game-card">${dateStr}<div class="matchup"><span class="team ${awayWon?'winner':'loser'}">${g.away}</span><span class="score">${g.asc}</span><span class="at">@</span><span class="team ${awayWon?'loser':'winner'}">${g.home}</span><span class="score">${g.hsc}</span></div><div class="format-links"><a href="${g.id}.html" class="format-link" title="Interactive">HTML</a><a href="${g.id}.png" class="format-link" title="Image">PNG</a></div></div>`;
 }
 
 function buildDateView() {
