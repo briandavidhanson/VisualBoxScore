@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Read - Visual Boxscores</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; color: #333; line-height: 1.8; }
+        header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 2rem; text-align: center; }
+        header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        header p { font-size: 1.1rem; opacity: 0.85; }
+        nav { background: #16213e; padding: 0.75rem; text-align: center; }
+        nav a { color: white; text-decoration: none; margin: 0 1rem; font-weight: 600; opacity: 0.85; transition: opacity 0.2s; }
+        nav a:hover { opacity: 1; }
+        main { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+        h2 { color: #16213e; font-size: 1.8rem; margin: 2.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 3px solid #16213e; }
+        h3 { color: #1a1a2e; font-size: 1.3rem; margin: 1.5rem 0 0.75rem 0; }
+        p { margin-bottom: 1rem; }
+        .section { background: white; border-radius: 12px; padding: 1.5rem 2rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .highlight { background: #f0f4ff; border-left: 4px solid #16213e; padding: 1rem 1.25rem; margin: 1rem 0; border-radius: 0 8px 8px 0; }
+        .symbol-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .symbol-table th, .symbol-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #ddd; }
+        .symbol-table th { background: #16213e; color: white; }
+        .symbol-table tr:hover { background: #f5f5f5; }
+        .symbol { font-family: monospace; font-size: 1.2rem; font-weight: bold; }
+        .color-box { display: inline-block; width: 20px; height: 20px; border-radius: 4px; vertical-align: middle; margin-right: 0.5rem; border: 1px solid #ccc; }
+        .red { background: rgba(220, 60, 60, 0.7); }
+        .blue { background: rgba(30, 80, 220, 0.7); }
+        .green { background: rgba(40, 140, 40, 0.7); }
+        .orange { background: rgba(230, 130, 0, 0.9); }
+        .green-bar { background: rgb(0, 150, 0); }
+        .red-bar { background: rgb(180, 0, 0); }
+        .gray-bar { background: #d3d3d3; }
+        .example { background: #fffbf0; border: 1px solid #f0e0c0; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+        .example-title { font-weight: 600; color: #886600; margin-bottom: 0.5rem; }
+        .toc { background: white; border-radius: 12px; padding: 1.5rem 2rem; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .toc h3 { margin-top: 0; }
+        .toc ul { list-style: none; padding-left: 0; }
+        .toc li { margin: 0.5rem 0; }
+        .toc a { color: #16213e; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+        footer { text-align: center; padding: 2rem; color: #666; font-size: 0.9rem; }
+        .key-concept { font-weight: 600; color: #16213e; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🏀 How to Read Visual Boxscores</h1>
+        <p>A complete guide to understanding the visualizations</p>
+    </header>
+    
+    <nav>
+        <a href="index.html">← Back to Games</a>
+    </nav>
+    
+    <main>
+        <div class="toc">
+            <h3>Table of Contents</h3>
+            <ul>
+                <li><a href="#overview">Overview: What Makes This Different</a></li>
+                <li><a href="#pmp">The Key Metric: Points Minus Possessions (pMp)</a></li>
+                <li><a href="#efficiency">Section 1: Efficiency Chart</a></li>
+                <li><a href="#timelines">Section 2: Player Timelines</a></li>
+                <li><a href="#boxscore">Section 3: Enhanced Box Score</a></li>
+                <li><a href="#glossary">Quick Reference Glossary</a></li>
+            </ul>
+        </div>
+
+        <div class="section" id="overview">
+            <h2>Overview: What Makes This Different</h2>
+            <p>Traditional box scores tell you <em>what</em> happened in a game—points, rebounds, assists. Visual Boxscores show you <em>how</em> and <em>when</em> it happened, possession by possession.</p>
+            
+            <p>Each visualization has three main sections stacked vertically:</p>
+            <ol>
+                <li><strong>Efficiency Chart (Stairclimber Chart)</strong> — The flow of the game, showing how each team performed over time</li>
+                <li><strong>Player Timelines</strong> — When each player was on the court, what they did, and how they did</li>
+                <li><strong>Enhanced Box Score</strong> — Traditional stats plus advanced metrics</li>
+            </ol>
+            
+            <div class="highlight">
+                <strong>Why possessions matter:</strong> Basketball is a game of possessions. Each team gets roughly the same number of chances to score. The team that scores more efficiently—more points per possession—usually wins. This visualization tracks every possession to show offensive efficiency in real-time.
+            </div>
+        </div>
+
+        <div class="section" id="pmp">
+            <h2>The Key Metric: Points Minus Possessions (pMp)</h2>
+            <p>The most important concept in these visualizations is <span class="key-concept">Points Minus Possessions (pMp)</span>.</p>
+            
+            <h3>What is pMp?</h3>
+            <p>pMp = Points Scored − Possessions Used</p>
+            
+            <p>Think of it this way: if you have 50 possessions and score 50 points, your pMp is 0. That's average (1 point per possession). If you score 55 points on those 50 possessions, your pMp is +5—you're beating expectations.</p>
+            
+            <div class="example">
+                <div class="example-title">Example</div>
+                <p>After 30 possessions, a team has scored 35 points.</p>
+                <p>pMp = 35 − 30 = <strong>+5</strong></p>
+                <p>This team is playing 5 points better than average efficiency.</p>
+            </div>
+            
+            <h3>Why use pMp instead of just points?</h3>
+            <p>Points alone don't tell you about efficiency. A team might have 60 points because they're scoring well, OR because they've just had more possessions. pMp separates efficiency from volume.</p>
+            
+            <div class="highlight">
+                <strong>Quick rule:</strong> pMp going UP = team is scoring efficiently. pMp going DOWN = team is struggling offensively (scoring less than 1 point per possession).
+            </div>
+        </div>
+
+        <div class="section" id="efficiency">
+            <h2>Section 1: Efficiency Chart</h2>
+            <p>The top chart shows how the game unfolded. The X-axis is possession number (not time), and the Y-axis is pMp and margin.</p>
+            
+            <h3>The Lines</h3>
+            <table class="symbol-table">
+                <tr>
+                    <th>Line</th>
+                    <th>What It Shows</th>
+                </tr>
+                <tr>
+                    <td><span class="color-box red"></span> Red Line</td>
+                    <td><strong>Away team's pMp</strong> — Their cumulative points minus possessions throughout the game</td>
+                </tr>
+                <tr>
+                    <td><span class="color-box blue"></span> Blue Line</td>
+                    <td><strong>Home team's pMp</strong> — Same metric for the home team</td>
+                </tr>
+                <tr>
+                    <td><span class="color-box green"></span> Green Line</td>
+                    <td><strong>Home margin</strong> — The score difference divided by 3, shown in "possession units" for easy comparison</td>
+                </tr>
+                <tr>
+                    <td><span class="color-box orange"></span> Orange Highlight</td>
+                    <td><strong>Clutch time</strong> — Final 5 minutes when margin is within 5 points</td>
+                </tr>
+            </table>
+            
+            <h3>Shot Markers</h3>
+            <p>Every shot attempt appears as a marker on the team's pMp line:</p>
+            <table class="symbol-table">
+                <tr>
+                    <th>Symbol</th>
+                    <th>Shot Type</th>
+                </tr>
+                <tr>
+                    <td><span class="symbol">●</span></td>
+                    <td>Close shot (within 5 feet) — layups, dunks, tip-ins</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">■</span></td>
+                    <td>Mid-range shot (5+ feet, inside the arc)</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">▲</span></td>
+                    <td>Three-pointer</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">/</span></td>
+                    <td>Free throw</td>
+                </tr>
+            </table>
+            
+            <h3>The Legend Boxes</h3>
+            <p>The legend on the left shows team totals for each category. The format is typically:</p>
+            <p><code>[made]-[attempted]; [points per shot] PPS → [total points]</code></p>
+            
+            <div class="example">
+                <div class="example-title">Reading the Legend</div>
+                <p><strong>Away 3PT</strong><br>9-32; 0.84 PPS → 27 pts</p>
+                <p>This means: 9 made out of 32 three-point attempts, averaging 0.84 points per shot, totaling 27 points.</p>
+            </div>
+        </div>
+
+        <div class="section" id="timelines">
+            <h2>Section 2: Player Timelines</h2>
+            <p>The middle section shows Gantt-style charts for each team—one row per player, showing when they were on the court and how they performed.</p>
+            
+            <h3>The Bars</h3>
+            <table class="symbol-table">
+                <tr>
+                    <th>Bar Color</th>
+                    <th>Meaning</th>
+                </tr>
+                <tr>
+                    <td><span class="color-box gray-bar"></span> Gray</td>
+                    <td>Player is on the <strong>bench</strong></td>
+                </tr>
+                <tr>
+                    <td><span class="color-box green-bar"></span> Green</td>
+                    <td>Player is on court with <strong>positive plus/minus</strong> during this stint</td>
+                </tr>
+                <tr>
+                    <td><span class="color-box red-bar"></span> Red</td>
+                    <td>Player is on court with <strong>negative plus/minus</strong> during this stint</td>
+                </tr>
+            </table>
+            <p>Darker colors = larger plus/minus (good or bad). The number at the end of each stint shows the exact plus/minus for that stretch.</p>
+            
+            <h3>Player Labels</h3>
+            <p>Each row is labeled: <code>Player Name, Height: +/- for game</code></p>
+            <p>Players are sorted by height (tallest at top).</p>
+            
+            <h3>Shot and Play Markers</h3>
+            <p>Symbols on each player's row show their individual contributions:</p>
+            
+            <h4>Made Shots (solid symbols)</h4>
+            <table class="symbol-table">
+                <tr>
+                    <td><span class="symbol">●</span></td>
+                    <td>Made close shot</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">■</span></td>
+                    <td>Made mid-range shot</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">▲</span></td>
+                    <td>Made three-pointer</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">/</span></td>
+                    <td>Made free throw</td>
+                </tr>
+            </table>
+            
+            <h4>Missed Shots</h4>
+            <table class="symbol-table">
+                <tr>
+                    <td><span class="symbol">+</span></td>
+                    <td>Missed close shot</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">✕</span></td>
+                    <td>Missed mid-range shot</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">Y</span></td>
+                    <td>Missed three-pointer</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">—</span></td>
+                    <td>Missed free throw</td>
+                </tr>
+            </table>
+            
+            <h4>Other Plays</h4>
+            <table class="symbol-table">
+                <tr>
+                    <td><span class="symbol">○</span></td>
+                    <td>Assist given / Shot was assisted (circle around made shot)</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">□</span></td>
+                    <td>Offensive rebound (at center) or Defensive rebound (lower)</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">✗</span></td>
+                    <td>Turnover (open) or Steal (filled, shown lower)</td>
+                </tr>
+                <tr>
+                    <td><span class="symbol">|</span></td>
+                    <td>Block (shown lower, defensive play)</td>
+                </tr>
+            </table>
+            
+            <div class="highlight">
+                <strong>Connecting lines:</strong> When a player gets an assist, a vertical line connects the assister's row to the shooter's row on that possession, helping you see the play develop.
+            </div>
+        </div>
+
+        <div class="section" id="boxscore">
+            <h2>Section 3: Enhanced Box Score</h2>
+            <p>The bottom tables look like traditional box scores but pack much more information into each column.</p>
+            
+            <h3>Column Guide</h3>
+            <table class="symbol-table">
+                <tr>
+                    <th>Column</th>
+                    <th>Format</th>
+                    <th>Explanation</th>
+                </tr>
+                <tr>
+                    <td><strong>MIN</strong></td>
+                    <td>minutes</td>
+                    <td>Minutes played</td>
+                </tr>
+                <tr>
+                    <td><strong>POSS/USED/%</strong></td>
+                    <td>poss / used / %</td>
+                    <td>Possessions played / Possessions used (shots, turnovers, FTs) / Usage rate</td>
+                </tr>
+                <tr>
+                    <td><strong>PTS/PPP</strong></td>
+                    <td>pts / ppp</td>
+                    <td>Points scored / Points per possession</td>
+                </tr>
+                <tr>
+                    <td><strong>CLS/PPS</strong></td>
+                    <td>made-att / pps</td>
+                    <td>Close shots (made-attempted) / Points per shot</td>
+                </tr>
+                <tr>
+                    <td><strong>MID/PPS</strong></td>
+                    <td>made-att / pps</td>
+                    <td>Mid-range shots / Points per shot</td>
+                </tr>
+                <tr>
+                    <td><strong>3PT/PPS</strong></td>
+                    <td>made-att / pps</td>
+                    <td>Three-pointers / Points per shot</td>
+                </tr>
+                <tr>
+                    <td><strong>FT/PPT</strong></td>
+                    <td>made-att / ppt</td>
+                    <td>Free throws / Points per trip</td>
+                </tr>
+                <tr>
+                    <td><strong>TOV/%/Pts</strong></td>
+                    <td>tov / % / pts</td>
+                    <td>Turnovers / Turnover rate / Points scored by opponent off those turnovers</td>
+                </tr>
+                <tr>
+                    <td><strong>AST/%/Pts</strong></td>
+                    <td>ast / % / pts</td>
+                    <td>Assists / Assist rate / Points generated from those assists</td>
+                </tr>
+                <tr>
+                    <td><strong>ORB/%/Pts</strong></td>
+                    <td>orb / % / pts</td>
+                    <td>Offensive rebounds / ORB rate / Points scored on possessions with those ORBs</td>
+                </tr>
+                <tr>
+                    <td><strong>DRB/%</strong></td>
+                    <td>drb / %</td>
+                    <td>Defensive rebounds / DRB rate</td>
+                </tr>
+                <tr>
+                    <td><strong>TRB/%</strong></td>
+                    <td>trb / %</td>
+                    <td>Total rebounds / TRB rate</td>
+                </tr>
+                <tr>
+                    <td><strong>STL/%/Pts</strong></td>
+                    <td>stl / % / pts</td>
+                    <td>Steals / Steal rate / Points scored off those steals</td>
+                </tr>
+                <tr>
+                    <td><strong>BLK/%</strong></td>
+                    <td>blk / %</td>
+                    <td>Blocks / Block rate</td>
+                </tr>
+                <tr>
+                    <td><strong>PF/%/Pts</strong></td>
+                    <td>pf / % / pts</td>
+                    <td>Personal fouls / Foul rate / Points scored by opponent from those fouls</td>
+                </tr>
+                <tr>
+                    <td><strong>GmSc/mGmSc</strong></td>
+                    <td>gmsc / mgmsc</td>
+                    <td>GameScore / Modified GameScore (see below)</td>
+                </tr>
+            </table>
+            
+            <h3>GameScore vs Modified GameScore</h3>
+            <p><strong>GameScore (GmSc)</strong> is John Hollinger's formula that tries to capture a player's total contribution in a single number. It weights scoring, efficiency, rebounds, assists, steals, blocks, turnovers, and fouls.</p>
+            
+            <p><strong>Modified GameScore (mGmSc)</strong> is a custom metric that incorporates <em>outcomes</em>—not just counting stats, but what those stats actually led to. For example:</p>
+            <ul>
+                <li>A steal that leads to a fast-break dunk is worth more than a steal that leads to a turnover</li>
+                <li>A turnover that the opponent scores off of is worse than one where they miss</li>
+                <li>An offensive rebound that leads to points is worth more than one that leads to a miss</li>
+            </ul>
+        </div>
+
+        <div class="section" id="glossary">
+            <h2>Quick Reference Glossary</h2>
+            <table class="symbol-table">
+                <tr>
+                    <th>Term</th>
+                    <th>Definition</th>
+                </tr>
+                <tr>
+                    <td><strong>pMp</strong></td>
+                    <td>Points Minus Possessions — measures offensive efficiency relative to average</td>
+                </tr>
+                <tr>
+                    <td><strong>PPS</strong></td>
+                    <td>Points Per Shot — efficiency on field goal attempts</td>
+                </tr>
+                <tr>
+                    <td><strong>PPP</strong></td>
+                    <td>Points Per Possession — overall offensive efficiency</td>
+                </tr>
+                <tr>
+                    <td><strong>Usage %</strong></td>
+                    <td>Percentage of team possessions a player "uses" (shot, turnover, or FTs)</td>
+                </tr>
+                <tr>
+                    <td><strong>Clutch</strong></td>
+                    <td>Final 5 minutes of game when margin is within 5 points</td>
+                </tr>
+                <tr>
+                    <td><strong>Stint</strong></td>
+                    <td>A continuous stretch of time a player is on the court</td>
+                </tr>
+                <tr>
+                    <td><strong>Plus/Minus</strong></td>
+                    <td>Point differential while a player is on the court</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="highlight" style="margin-top: 2rem;">
+            <strong>Still have questions?</strong> The best way to learn is to pick a game you watched and explore the visualization. You'll start recognizing the runs, the momentum shifts, and the key plays that decided the outcome.
+        </div>
+    </main>
+    
+    <footer>
+        <p>Visual Boxscores — Beyond the box score</p>
+    </footer>
+</body>
+</html>
