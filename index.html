@@ -64,55 +64,64 @@
     <footer><p>Visual Boxscores — Beyond the box score</p></footer>
     <script>
 const games = [
-    {id:"202601270DEN",away:"Detroit Pistons",asc:109,home:"Denver Nuggets",hsc:107,date:"Jan 27"},
-    {id:"202601270NYK",away:"Sacramento Kings",asc:87,home:"New York Knicks",hsc:103,date:"Jan 27"},
-    {id:"202601270OKC",away:"New Orleans Pelicans",asc:95,home:"Oklahoma City Thunder",hsc:104,date:"Jan 27"},
-    {id:"202601270PHI",away:"Milwaukee Bucks",asc:122,home:"Philadelphia 76ers",hsc:139,date:"Jan 27"},
-    {id:"202601270PHO",away:"Brooklyn Nets",asc:102,home:"Phoenix Suns",hsc:106,date:"Jan 27"},
-    {id:"202601270UTA",away:"Los Angeles Clippers",asc:115,home:"Utah Jazz",hsc:103,date:"Jan 27"},
+    {id:"202601280UTA",away:"Golden State Warriors",asc:140,home:"Utah Jazz",hsc:124,date:"Jan 28"},
+    {id:"202601280TOR",away:"New York Knicks",asc:119,home:"Toronto Raptors",hsc:92,date:"Jan 28"},
+    {id:"202601280MIA",away:"Orlando Magic",asc:133,home:"Miami Heat",hsc:124,date:"Jan 28"},
+    {id:"202601280MEM",away:"Charlotte Hornets",asc:112,home:"Memphis Grizzlies",hsc:97,date:"Jan 28"},
+    {id:"202601280IND",away:"Chicago Bulls",asc:110,home:"Indiana Pacers",hsc:113,date:"Jan 28"},
+    {id:"202601280HOU",away:"San Antonio Spurs",asc:111,home:"Houston Rockets",hsc:99,date:"Jan 28"},
+    {id:"202601280DAL",away:"Minnesota Timberwolves",asc:118,home:"Dallas Mavericks",hsc:105,date:"Jan 28"},
+    {id:"202601280CLE",away:"Los Angeles Lakers",asc:99,home:"Cleveland Cavaliers",hsc:129,date:"Jan 28"},
+    {id:"202601280BOS",away:"Atlanta Hawks",asc:117,home:"Boston Celtics",hsc:106,date:"Jan 28"},
     {id:"202601270WAS",away:"Portland Trail Blazers",asc:111,home:"Washington Wizards",hsc:115,date:"Jan 27"},
-    {id:"202601260ATL",away:"Indiana Pacers",asc:116,home:"Atlanta Hawks",hsc:132,date:"Jan 26"},
-    {id:"202601260BOS",away:"Portland Trail Blazers",asc:94,home:"Boston Celtics",hsc:102,date:"Jan 26"},
-    {id:"202601260CHI",away:"Los Angeles Lakers",asc:129,home:"Chicago Bulls",hsc:118,date:"Jan 26"},
-    {id:"202601260CHO",away:"Philadelphia 76ers",asc:93,home:"Charlotte Hornets",hsc:130,date:"Jan 26"},
-    {id:"202601260CLE",away:"Orlando Magic",asc:98,home:"Cleveland Cavaliers",hsc:114,date:"Jan 26"},
-    {id:"202601260HOU",away:"Memphis Grizzlies",asc:99,home:"Houston Rockets",hsc:108,date:"Jan 26"},
+    {id:"202601270UTA",away:"Los Angeles Clippers",asc:115,home:"Utah Jazz",hsc:103,date:"Jan 27"},
+    {id:"202601270PHO",away:"Brooklyn Nets",asc:102,home:"Phoenix Suns",hsc:106,date:"Jan 27"},
+    {id:"202601270PHI",away:"Milwaukee Bucks",asc:122,home:"Philadelphia 76ers",hsc:139,date:"Jan 27"},
+    {id:"202601270OKC",away:"New Orleans Pelicans",asc:95,home:"Oklahoma City Thunder",hsc:104,date:"Jan 27"},
+    {id:"202601270NYK",away:"Sacramento Kings",asc:87,home:"New York Knicks",hsc:103,date:"Jan 27"},
+    {id:"202601270DEN",away:"Detroit Pistons",asc:109,home:"Denver Nuggets",hsc:107,date:"Jan 27"},
     {id:"202601260MIN",away:"Golden State Warriors",asc:83,home:"Minnesota Timberwolves",hsc:108,date:"Jan 26"},
-    {id:"202601250DET",away:"Sacramento Kings",asc:116,home:"Detroit Pistons",hsc:139,date:"Jan 25"},
-    {id:"202601250LAC",away:"Brooklyn Nets",asc:89,home:"Los Angeles Clippers",hsc:126,date:"Jan 25"},
-    {id:"202601250MIN",away:"Golden State Warriors",asc:111,home:"Minnesota Timberwolves",hsc:85,date:"Jan 25"},
-    {id:"202601250OKC",away:"Toronto Raptors",asc:103,home:"Oklahoma City Thunder",hsc:101,date:"Jan 25"},
-    {id:"202601250PHO",away:"Miami Heat",asc:111,home:"Phoenix Suns",hsc:102,date:"Jan 25"},
+    {id:"202601260HOU",away:"Memphis Grizzlies",asc:99,home:"Houston Rockets",hsc:108,date:"Jan 26"},
+    {id:"202601260CLE",away:"Orlando Magic",asc:98,home:"Cleveland Cavaliers",hsc:114,date:"Jan 26"},
+    {id:"202601260CHO",away:"Philadelphia 76ers",asc:93,home:"Charlotte Hornets",hsc:130,date:"Jan 26"},
+    {id:"202601260CHI",away:"Los Angeles Lakers",asc:129,home:"Chicago Bulls",hsc:118,date:"Jan 26"},
+    {id:"202601260BOS",away:"Portland Trail Blazers",asc:94,home:"Boston Celtics",hsc:102,date:"Jan 26"},
+    {id:"202601260ATL",away:"Indiana Pacers",asc:116,home:"Atlanta Hawks",hsc:132,date:"Jan 26"},
     {id:"202601250SAS",away:"New Orleans Pelicans",asc:104,home:"San Antonio Spurs",hsc:95,date:"Jan 25"},
-    {id:"202601240CHI",away:"Boston Celtics",asc:111,home:"Chicago Bulls",hsc:114,date:"Jan 24"},
-    {id:"202601240CHO",away:"Washington Wizards",asc:115,home:"Charlotte Hornets",hsc:119,date:"Jan 24"},
-    {id:"202601240DAL",away:"Los Angeles Lakers",asc:116,home:"Dallas Mavericks",hsc:110,date:"Jan 24"},
-    {id:"202601240ORL",away:"Cleveland Cavaliers",asc:119,home:"Orlando Magic",hsc:105,date:"Jan 24"},
-    {id:"202601240PHI",away:"New York Knicks",asc:112,home:"Philadelphia 76ers",hsc:109,date:"Jan 24"},
+    {id:"202601250PHO",away:"Miami Heat",asc:111,home:"Phoenix Suns",hsc:102,date:"Jan 25"},
+    {id:"202601250OKC",away:"Toronto Raptors",asc:103,home:"Oklahoma City Thunder",hsc:101,date:"Jan 25"},
+    {id:"202601250MIN",away:"Golden State Warriors",asc:111,home:"Minnesota Timberwolves",hsc:85,date:"Jan 25"},
+    {id:"202601250LAC",away:"Brooklyn Nets",asc:89,home:"Los Angeles Clippers",hsc:126,date:"Jan 25"},
+    {id:"202601250DET",away:"Sacramento Kings",asc:116,home:"Detroit Pistons",hsc:139,date:"Jan 25"},
     {id:"202601240UTA",away:"Miami Heat",asc:147,home:"Utah Jazz",hsc:116,date:"Jan 24"},
-    {id:"202601230ATL",away:"Phoenix Suns",asc:103,home:"Atlanta Hawks",hsc:110,date:"Jan 23"},
-    {id:"202601230BRK",away:"Boston Celtics",asc:130,home:"Brooklyn Nets",hsc:126,date:"Jan 23"},
-    {id:"202601230CLE",away:"Sacramento Kings",asc:118,home:"Cleveland Cavaliers",hsc:123,date:"Jan 23"},
-    {id:"202601230DET",away:"Houston Rockets",asc:111,home:"Detroit Pistons",hsc:104,date:"Jan 23"},
-    {id:"202601230MEM",away:"New Orleans Pelicans",asc:133,home:"Memphis Grizzlies",hsc:127,date:"Jan 23"},
-    {id:"202601230MIL",away:"Denver Nuggets",asc:102,home:"Milwaukee Bucks",hsc:100,date:"Jan 23"},
-    {id:"202601230OKC",away:"Indiana Pacers",asc:117,home:"Oklahoma City Thunder",hsc:114,date:"Jan 23"},
+    {id:"202601240PHI",away:"New York Knicks",asc:112,home:"Philadelphia 76ers",hsc:109,date:"Jan 24"},
+    {id:"202601240ORL",away:"Cleveland Cavaliers",asc:119,home:"Orlando Magic",hsc:105,date:"Jan 24"},
+    {id:"202601240DAL",away:"Los Angeles Lakers",asc:116,home:"Dallas Mavericks",hsc:110,date:"Jan 24"},
+    {id:"202601240CHO",away:"Washington Wizards",asc:115,home:"Charlotte Hornets",hsc:119,date:"Jan 24"},
+    {id:"202601240CHI",away:"Boston Celtics",asc:111,home:"Chicago Bulls",hsc:114,date:"Jan 24"},
     {id:"202601230POR",away:"Toronto Raptors",asc:110,home:"Portland Trail Blazers",hsc:98,date:"Jan 23"},
-    {id:"202601220DAL",away:"Golden State Warriors",asc:115,home:"Dallas Mavericks",hsc:123,date:"Jan 22"},
-    {id:"202601220LAC",away:"Los Angeles Lakers",asc:104,home:"Los Angeles Clippers",hsc:112,date:"Jan 22"},
-    {id:"202601220MIN",away:"Chicago Bulls",asc:120,home:"Minnesota Timberwolves",hsc:115,date:"Jan 22"},
-    {id:"202601220ORL",away:"Charlotte Hornets",asc:124,home:"Orlando Magic",hsc:97,date:"Jan 22"},
-    {id:"202601220PHI",away:"Houston Rockets",asc:122,home:"Philadelphia 76ers",hsc:128,date:"Jan 22"},
-    {id:"202601220POR",away:"Miami Heat",asc:110,home:"Portland Trail Blazers",hsc:127,date:"Jan 22"},
-    {id:"202601220UTA",away:"San Antonio Spurs",asc:126,home:"Utah Jazz",hsc:109,date:"Jan 22"},
+    {id:"202601230OKC",away:"Indiana Pacers",asc:117,home:"Oklahoma City Thunder",hsc:114,date:"Jan 23"},
+    {id:"202601230MIL",away:"Denver Nuggets",asc:102,home:"Milwaukee Bucks",hsc:100,date:"Jan 23"},
+    {id:"202601230MEM",away:"New Orleans Pelicans",asc:133,home:"Memphis Grizzlies",hsc:127,date:"Jan 23"},
+    {id:"202601230DET",away:"Houston Rockets",asc:111,home:"Detroit Pistons",hsc:104,date:"Jan 23"},
+    {id:"202601230CLE",away:"Sacramento Kings",asc:118,home:"Cleveland Cavaliers",hsc:123,date:"Jan 23"},
+    {id:"202601230BRK",away:"Boston Celtics",asc:130,home:"Brooklyn Nets",hsc:126,date:"Jan 23"},
+    {id:"202601230ATL",away:"Phoenix Suns",asc:103,home:"Atlanta Hawks",hsc:110,date:"Jan 23"},
     {id:"202601220WAS",away:"Denver Nuggets",asc:107,home:"Washington Wizards",hsc:97,date:"Jan 22"},
-    {id:"202601210BOS",away:"Indiana Pacers",asc:104,home:"Boston Celtics",hsc:119,date:"Jan 21"},
-    {id:"202601210CHO",away:"Cleveland Cavaliers",asc:94,home:"Charlotte Hornets",hsc:87,date:"Jan 21"},
-    {id:"202601210MEM",away:"Atlanta Hawks",asc:124,home:"Memphis Grizzlies",hsc:122,date:"Jan 21"},
-    {id:"202601210MIL",away:"Oklahoma City Thunder",asc:122,home:"Milwaukee Bucks",hsc:102,date:"Jan 21"},
-    {id:"202601210NOP",away:"Detroit Pistons",asc:112,home:"New Orleans Pelicans",hsc:104,date:"Jan 21"},
+    {id:"202601220UTA",away:"San Antonio Spurs",asc:126,home:"Utah Jazz",hsc:109,date:"Jan 22"},
+    {id:"202601220POR",away:"Miami Heat",asc:110,home:"Portland Trail Blazers",hsc:127,date:"Jan 22"},
+    {id:"202601220PHI",away:"Houston Rockets",asc:122,home:"Philadelphia 76ers",hsc:128,date:"Jan 22"},
+    {id:"202601220ORL",away:"Charlotte Hornets",asc:124,home:"Orlando Magic",hsc:97,date:"Jan 22"},
+    {id:"202601220MIN",away:"Chicago Bulls",asc:120,home:"Minnesota Timberwolves",hsc:115,date:"Jan 22"},
+    {id:"202601220LAC",away:"Los Angeles Lakers",asc:104,home:"Los Angeles Clippers",hsc:112,date:"Jan 22"},
+    {id:"202601220DAL",away:"Golden State Warriors",asc:115,home:"Dallas Mavericks",hsc:123,date:"Jan 22"},
+    {id:"202601210SAC",away:"Toronto Raptors",asc:122,home:"Sacramento Kings",hsc:109,date:"Jan 21"},
     {id:"202601210NYK",away:"Brooklyn Nets",asc:66,home:"New York Knicks",hsc:120,date:"Jan 21"},
-    {id:"202601210SAC",away:"Toronto Raptors",asc:122,home:"Sacramento Kings",hsc:109,date:"Jan 21"}
+    {id:"202601210NOP",away:"Detroit Pistons",asc:112,home:"New Orleans Pelicans",hsc:104,date:"Jan 21"},
+    {id:"202601210MIL",away:"Oklahoma City Thunder",asc:122,home:"Milwaukee Bucks",hsc:102,date:"Jan 21"},
+    {id:"202601210MEM",away:"Atlanta Hawks",asc:124,home:"Memphis Grizzlies",hsc:122,date:"Jan 21"},
+    {id:"202601210CHO",away:"Cleveland Cavaliers",asc:94,home:"Charlotte Hornets",hsc:87,date:"Jan 21"},
+    {id:"202601210BOS",away:"Indiana Pacers",asc:104,home:"Boston Celtics",hsc:119,date:"Jan 21"}
 ];
 
 function gameCard(g, showDate=false) {
@@ -122,23 +131,41 @@ function gameCard(g, showDate=false) {
 }
 
 function buildDateView() {
-    const dates = {};
+    const months = {};
     games.forEach(g => {
-        const d = g.date;
-        if (!dates[d]) dates[d] = [];
-        dates[d].push(g);
+        const dateParts = g.date.split(' ');
+        const monthName = dateParts[0];
+        const day = parseInt(dateParts[1]);
+        const monthKey = monthName + ' 2026';
+        if (!months[monthKey]) months[monthKey] = {};
+        if (!months[monthKey][day]) months[monthKey][day] = [];
+        months[monthKey][day].push(g);
     });
-    const sortedDates = Object.keys(dates).sort((a,b) => {
-        const da = parseInt(a.split(' ')[1]);
-        const db = parseInt(b.split(' ')[1]);
-        return db - da;
+    
+    let html = '';
+    const sortedMonths = Object.keys(months).sort((a, b) => {
+        const monthOrder = {'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6, 'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12};
+        const [aMonth] = a.split(' ');
+        const [bMonth] = b.split(' ');
+        return monthOrder[bMonth] - monthOrder[aMonth];
     });
-    let html = `<div class="month-section"><button class="month-btn" onclick="toggleMonth(this)"><span>January 2026</span><span class="arrow">▶</span></button><div class="month-content">`;
-    sortedDates.forEach(d => {
-        const gms = dates[d];
-        html += `<div class="date-section"><button class="date-btn" onclick="toggleDate(this)"><span>January ${d.split(' ')[1]} <span class="game-count">(${gms.length} games)</span></span><span class="arrow">▶</span></button><div class="date-content"><div class="games-list">${gms.map(g=>gameCard(g)).join('')}</div></div></div>`;
+    
+    sortedMonths.forEach(month => {
+        const days = months[month];
+        const sortedDays = Object.keys(days).map(Number).sort((a, b) => b - a);
+        const totalGames = sortedDays.reduce((sum, d) => sum + days[d].length, 0);
+        
+        html += `<div class="month-section"><button class="month-btn" onclick="toggleMonth(this)"><span>${month} <span class="game-count">(${totalGames} games)</span></span><span class="arrow">▶</span></button><div class="month-content">`;
+        
+        sortedDays.forEach(day => {
+            const gms = days[day];
+            const monthName = month.split(' ')[0];
+            html += `<div class="date-section"><button class="date-btn" onclick="toggleDate(this)"><span>${monthName} ${day} <span class="game-count">(${gms.length} games)</span></span><span class="arrow">▶</span></button><div class="date-content"><div class="games-list">${gms.map(g=>gameCard(g)).join('')}</div></div></div>`;
+        });
+        
+        html += `</div></div>`;
     });
-    html += `</div></div>`;
+    
     document.getElementById('dateView').innerHTML = html;
 }
 
