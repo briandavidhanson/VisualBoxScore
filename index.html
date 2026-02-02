@@ -207,6 +207,7 @@ function buildDateView() {
 
 function buildTeamView() {
     const teams = {};
+    const monthOrder = {'Jan':1,'Feb':2,'Mar':3,'Apr':4,'May':5,'Jun':6,'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12};
     games.forEach(g => {
         [g.away, g.home].forEach(t => {
             if (!teams[t]) teams[t] = [];
@@ -217,8 +218,11 @@ function buildTeamView() {
     let html = '';
     sortedTeams.forEach(t => {
         const gms = teams[t].sort((a,b) => {
-            const da = parseInt(a.date.split(' ')[1]);
-            const db = parseInt(b.date.split(' ')[1]);
+            const partsA = a.date.split(' ');
+            const partsB = b.date.split(' ');
+            const ma = monthOrder[partsA[0]], da = parseInt(partsA[1]);
+            const mb = monthOrder[partsB[0]], db = parseInt(partsB[1]);
+            if (ma !== mb) return mb - ma;
             return db - da;
         });
         html += `<div class="team-section"><button class="team-btn" onclick="toggleTeam(this)"><span>${t} <span class="game-count">(${gms.length} games)</span></span><span class="arrow">▶</span></button><div class="team-content"><div class="games-list">${gms.map(g=>gameCard(g,true)).join('')}</div></div></div>`;
