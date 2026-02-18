@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NBA Stats Explorers</title>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #fafafa;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.tab-bar {
+  display: flex;
+  border-bottom: 2px solid #16213e;
+  margin-bottom: 0;
+}
+.tab-btn {
+  padding: 10px 24px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: inherit;
+  color: #666;
+  border-radius: 6px 6px 0 0;
+  transition: background 0.15s, color 0.15s;
+}
+.tab-btn:hover { background: #e8eaf0; color: #16213e; }
+.tab-btn.active {
+  background: #16213e;
+  color: #fff;
+  font-weight: 600;
+}
+.tab-panel { display: none; padding: 24px 0; }
+.tab-panel.active { display: block; }
+.controls {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.control-group label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.control-group select, .control-group input[type="number"] {
+  height: 36px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  padding: 0 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.control-group select { width: 340px; }
+.stat-line {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+/* Rate tab controls */
+.rate-controls {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.rate-controls label.group-label {
+  font-weight: bold;
+  margin-bottom: 4px;
+  display: block;
+}
+.rate-controls .radio-group label,
+.rate-controls .check-group label {
+  display: block;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 0;
+}
+.rate-controls input[type="radio"],
+.rate-controls input[type="checkbox"] {
+  margin-right: 6px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>NBA Stats Explorers</h1>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="season">Season Explorer</button>
+    <button class="tab-btn" data-tab="player">Player Explorer</button>
+    <button class="tab-btn" data-tab="rate">Rate vs Efficiency</button>
+  </div>
+
+  <!-- ============ SEASON TAB ============ -->
+  <div id="tab-season" class="tab-panel active">
+    <p class="stat-line" id="season-stat-line"></p>
+    <div class="controls">
+      <div class="control-group">
+        <label for="season-x">X-axis</label>
+        <select id="season-x"></select>
+      </div>
+      <div class="control-group">
+        <label for="season-y">Y-axis</label>
+        <select id="season-y"></select>
+      </div>
+    </div>
+    <div id="season-chart"></div>
+  </div>
+
+  <!-- ============ PLAYER TAB ============ -->
+  <div id="tab-player" class="tab-panel">
+    <p class="stat-line" id="player-stat-line"></p>
+    <div class="controls">
+      <div class="control-group">
+        <label for="player-x">X-axis</label>
+        <select id="player-x" style="width:300px"></select>
+      </div>
+      <div class="control-group">
+        <label for="player-y">Y-axis</label>
+        <select id="player-y" style="width:300px"></select>
+      </div>
+      <div class="control-group">
+        <label for="player-team">Team</label>
+        <select id="player-team" style="width:140px"></select>
+      </div>
+      <div class="control-group">
+        <label for="player-min-poss">Min possessions</label>
+        <input id="player-min-poss" type="number" value="200" min="0" step="50" style="width:100px">
+      </div>
+    </div>
+    <div id="player-chart"></div>
+  </div>
+
+  <!-- ============ RATE TAB ============ -->
+  <div id="tab-rate" class="tab-panel">
+    <div class="rate-controls">
+      <div>
+        <label class="group-label">View</label>
+        <div class="radio-group">
+          <label><input type="radio" name="rate-view" value="faceted" checked> Faceted (2x2 Shot Types)</label>
+          <label><input type="radio" name="rate-view" value="unfaceted"> Unfaceted (Overlay)</label>
+        </div>
+      </div>
+      <div>
+        <label class="group-label">Side</label>
+        <div class="radio-group">
+          <label><input type="radio" name="rate-side" value="" checked> Offense</label>
+          <label><input type="radio" name="rate-side" value="opp_"> Defense (opponent)</label>
+          <label><input type="radio" name="rate-side" value="both"> Both</label>
+        </div>
+      </div>
+      <div id="rate-options-container" style="display:none">
+        <label class="group-label">Options</label>
+        <label style="font-size:14px;cursor:pointer;display:block;padding:2px 0"><input type="checkbox" id="rate-show-avg"> Show averages</label>
+        <label style="font-size:14px;cursor:pointer;display:block;padding:2px 0" id="rate-connect-label"><input type="checkbox" id="rate-connect-dots"> Connect team pairs</label>
+      </div>
+      <div id="rate-category-container">
+        <label class="group-label">Categories</label>
+        <div class="check-group" id="rate-categories"></div>
+      </div>
+    </div>
+    <div id="rate-chart"></div>
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+   DATA & STATE
+   =================================================================== */
+let seasonData = [];
+let playerData = [];
+
+const SEASON_EXCLUDE = new Set([
+  'team_abbr','team_name','games','home_games','away_games',
+  'game_id','game_date','is_home',
+]);
+const PLAYER_EXCLUDE = new Set([
+  'player_id','player_name','games','game_id','game_date',
+  'height_inches','team_abbr',
+  'close_fg','mid_fg','three_fg','ft_fg',
+]);
+
+/* ===================================================================
+   CATEGORY DEFINITIONS (Rate vs Efficiency)
+   =================================================================== */
+const SHOT_CATEGORIES = [
+  {label:'Close (\u22645ft)', rate:'close_freq', eff:'close_pps', eff_num:null, eff_den:null, color:'green', symbol:'circle'},
+  {label:'Mid-Range', rate:'mid_freq', eff:'mid_pps', eff_num:null, eff_den:null, color:'blue', symbol:'square'},
+  {label:'3-Pointer', rate:'three_freq', eff:'three_pps', eff_num:null, eff_den:null, color:'red', symbol:'triangle-up'},
+  {label:'FT Trip', rate:'ft_trip_freq', eff:'ft_ppt', eff_num:null, eff_den:null, color:'purple', symbol:'diamond'},
+];
+const EXTRA_CATEGORIES = [
+  {label:'Steals', rate:'stl_per100', eff:null, eff_num:'stl_pts', eff_den:'stl', color:'orange', symbol:'star'},
+  {label:'Turnovers', rate:'tov_per100', eff:null, eff_num:'tov_pts', eff_den:'tov', color:'brown', symbol:'pentagon'},
+  {label:'Off. Rebounds', rate:'oreb_per100', eff:null, eff_num:'orb_pts', eff_den:'oreb', color:'teal', symbol:'hexagon'},
+  {label:'Assists', rate:'ast_per100', eff:null, eff_num:'ast_pts', eff_den:'ast', color:'gold', symbol:'cross'},
+  {label:'Blocks', rate:'blk_per100', eff:null, eff_num:null, eff_den:null, color:'gray', symbol:'bowtie'},
+  {label:'Fouls', rate:'pf_per100', eff:null, eff_num:'pf_pts', eff_den:'pf', color:'hotpink', symbol:'hourglass'},
+  {label:'Fast Break', rate:'fb_poss_per100', eff:null, eff_num:'fb_pts', eff_den:'fb_poss', color:'cyan', symbol:'triangle-down'},
+  {label:'Clutch', rate:'clutch_poss_per100', eff:null, eff_num:'clutch_pts', eff_den:'clutch_poss', color:'darkred', symbol:'triangle-left'},
+];
+const ALL_CATEGORIES = SHOT_CATEGORIES.concat(EXTRA_CATEGORIES);
+const CAT_BY_LABEL = {};
+ALL_CATEGORIES.forEach(c => CAT_BY_LABEL[c.label] = c);
+
+/* ===================================================================
+   HELPERS
+   =================================================================== */
+function isNumeric(val) {
+  return typeof val === 'number' && isFinite(val);
+}
+
+function getNumericCols(data, exclude) {
+  if (!data.length) return [];
+  const cols = [];
+  for (const key of Object.keys(data[0])) {
+    if (exclude.has(key)) continue;
+    // Check if the column has string-like FG display values (e.g. "12-34")
+    if (typeof data[0][key] === 'string') continue;
+    if (data.some(r => isNumeric(r[key]))) cols.push(key);
+  }
+  return cols.sort();
+}
+
+function friendlySeason(col) {
+  let label = col.replace(/_/g, ' ').replace(/pct/g, '%').replace(/per100/g, '/100');
+  if (label.startsWith('opp ')) label = 'Opp ' + label.slice(4);
+  return label.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function friendlyPlayer(col) {
+  let label = col.replace(/_/g, ' ').replace(/pct/g, '%').replace(/per100/g, '/100').replace(/per game/g, '/G');
+  return label.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function col(data, key) { return data.map(r => r[key]); }
+function mean(arr) {
+  const valid = arr.filter(isNumeric);
+  return valid.length ? valid.reduce((a,b) => a+b, 0) / valid.length : 0;
+}
+
+function populateSelect(sel, cols, friendlyFn) {
+  sel.innerHTML = '';
+  cols.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = friendlyFn(c);
+    sel.appendChild(opt);
+  });
+}
+
+/* ===================================================================
+   TAB SWITCHING
+   =================================================================== */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ===================================================================
+   SEASON EXPLORER
+   =================================================================== */
+function updateSeasonChart() {
+  const xCol = document.getElementById('season-x').value;
+  const yCol = document.getElementById('season-y').value;
+  if (!xCol || !yCol) return;
+
+  const x = col(seasonData, xCol);
+  const y = col(seasonData, yCol);
+  const labels = col(seasonData, 'team_abbr');
+  const xMean = mean(x);
+  const yMean = mean(y);
+
+  const traces = [
+    // Top histogram (row1, col1) -> xaxis/yaxis
+    {
+      x: x, type: 'histogram', nbinsx: 12,
+      marker: {color:'rgba(44,120,180,0.5)', line:{color:'rgba(44,120,180,0.8)', width:1}},
+      showlegend: false, xaxis: 'x', yaxis: 'y',
+    },
+    // Right histogram (row2, col2) -> xaxis4/yaxis4
+    {
+      y: y, type: 'histogram', nbinsx: 12,
+      marker: {color:'rgba(44,120,180,0.5)', line:{color:'rgba(44,120,180,0.8)', width:1}},
+      showlegend: false, xaxis: 'x4', yaxis: 'y4',
+    },
+    // Main scatter (row2, col1) -> xaxis2/yaxis3
+    {
+      x: x, y: y, mode: 'markers+text', type: 'scatter',
+      text: labels, textposition: 'top center',
+      textfont: {size: 10, color: '#444'},
+      marker: {size: 9, color: 'rgba(44,120,180,0.75)', line:{width:1, color:'white'}},
+      hovertemplate: '<b>%{text}</b><br>' + friendlySeason(xCol) + ': %{x:.2f}<br>' + friendlySeason(yCol) + ': %{y:.2f}<extra></extra>',
+      showlegend: false, xaxis: 'x2', yaxis: 'y3',
+    },
+  ];
+
+  const layout = {
+    height: 700, width: 900,
+    plot_bgcolor: 'white', paper_bgcolor: '#fafafa',
+    margin: {l:60, r:20, t:30, b:60}, bargap: 0.06,
+    // Grid: 2x2 with shared axes
+    xaxis:  {domain: [0, 0.82], showticklabels: false, showgrid: false, matches: 'x2'},
+    yaxis:  {domain: [0.82, 1], showticklabels: false, showgrid: false},
+    xaxis2: {domain: [0, 0.82], anchor: 'y3', title: {text: friendlySeason(xCol), font:{size:13}}, showgrid: true, gridcolor:'#eee', zeroline: false},
+    yaxis3: {domain: [0, 0.82], anchor: 'x2', title: {text: friendlySeason(yCol), font:{size:13}}, showgrid: true, gridcolor:'#eee', zeroline: false},
+    xaxis4: {domain: [0.84, 1], anchor: 'y4', showticklabels: false, showgrid: false},
+    yaxis4: {domain: [0, 0.82], showticklabels: false, showgrid: false, matches: 'y3'},
+    // Invisible top-right cell
+    xaxis3: {domain: [0.84, 1], visible: false},
+    yaxis2: {domain: [0.82, 1], visible: false},
+    shapes: [
+      {type:'line', xref:'x2', yref:'y3', x0: xMean, x1: xMean, y0: 0, y1: 1, yref:'y3 domain', line:{dash:'dot', color:'#bbb', width:1}},
+      {type:'line', xref:'x2', yref:'y3', x0: 0, x1: 1, xref:'x2 domain', y0: yMean, y1: yMean, line:{dash:'dot', color:'#bbb', width:1}},
+    ],
+  };
+
+  Plotly.react('season-chart', traces, layout, {displayModeBar: false});
+}
+
+/* ===================================================================
+   PLAYER EXPLORER
+   =================================================================== */
+function updatePlayerChart() {
+  const xCol = document.getElementById('player-x').value;
+  const yCol = document.getElementById('player-y').value;
+  const team = document.getElementById('player-team').value;
+  let minPoss = parseInt(document.getElementById('player-min-poss').value, 10);
+  if (isNaN(minPoss) || minPoss < 0) minPoss = 0;
+
+  const dfAll = playerData.filter(r => r.poss_played >= minPoss);
+  const xLeague = col(dfAll, xCol).filter(isNumeric);
+  const yLeague = col(dfAll, yCol).filter(isNumeric);
+  const xLeagueMean = mean(xLeague);
+  const yLeagueMean = mean(yLeague);
+
+  // League-wide ranges with 5% padding
+  const xMin = Math.min(...xLeague), xMax = Math.max(...xLeague);
+  const yMin = Math.min(...yLeague), yMax = Math.max(...yLeague);
+  const xPad = (xMax - xMin) * 0.05;
+  const yPad = (yMax - yMin) * 0.05;
+  const xRange = [xMin - xPad, xMax + xPad];
+  const yRange = [yMin - yPad, yMax + yPad];
+
+  // League-wide trendline
+  let leagueTrend = null;
+  const pairs = dfAll.filter(r => isNumeric(r[xCol]) && isNumeric(r[yCol]));
+  if (pairs.length >= 2) {
+    const xs = col(pairs, xCol), ys = col(pairs, yCol);
+    const n = xs.length;
+    const sx = xs.reduce((a,b)=>a+b,0), sy = ys.reduce((a,b)=>a+b,0);
+    const sxx = xs.reduce((a,b)=>a+b*b,0), sxy = xs.reduce((a,v,i)=>a+v*ys[i],0);
+    const m = (n*sxy - sx*sy) / (n*sxx - sx*sx);
+    const b = (sy - m*sx) / n;
+    const yHat = xs.map(v => m*v + b);
+    const ssRes = ys.reduce((a,v,i)=>a+(v-yHat[i])**2,0);
+    const yMeanL = sy/n;
+    const ssTot = ys.reduce((a,v)=>a+(v-yMeanL)**2,0);
+    const r2 = ssTot > 0 ? 1 - ssRes/ssTot : 0;
+    leagueTrend = {m, b, r2, xMin: Math.min(...xs), xMax: Math.max(...xs), yMax: Math.max(...ys)};
+  }
+
+  // Filter by team
+  const df = team === 'ALL' ? dfAll : dfAll.filter(r => r.team_abbr === team);
+  const x = col(df, xCol);
+  const y = col(df, yCol);
+  const labels = col(df, 'player_name');
+  const showText = team !== 'ALL';
+
+  const traces = [
+    // Top histogram - league-wide
+    {
+      x: xLeague, type:'histogram', nbinsx:20,
+      marker:{color:'rgba(44,120,180,0.5)', line:{color:'rgba(44,120,180,0.8)', width:1}},
+      showlegend:false, xaxis:'x', yaxis:'y',
+    },
+    // Right histogram - league-wide
+    {
+      y: yLeague, type:'histogram', nbinsx:20,
+      marker:{color:'rgba(44,120,180,0.5)', line:{color:'rgba(44,120,180,0.8)', width:1}},
+      showlegend:false, xaxis:'x4', yaxis:'y4',
+    },
+    // Main scatter - filtered
+    {
+      x: x, y: y, type:'scatter',
+      mode: showText ? 'markers+text' : 'markers',
+      text: labels,
+      textposition: showText ? 'top center' : undefined,
+      textfont: showText ? {size:9, color:'#444'} : undefined,
+      marker:{size:7, color:'rgba(44,120,180,0.6)', line:{width:0.5, color:'white'}},
+      hovertemplate: '<b>%{text}</b><br>' + friendlyPlayer(xCol) + ': %{x:.2f}<br>' + friendlyPlayer(yCol) + ': %{y:.2f}<extra></extra>',
+      showlegend:false, xaxis:'x2', yaxis:'y3',
+    },
+  ];
+
+  // Add trendline
+  if (leagueTrend) {
+    const {m, b, r2} = leagueTrend;
+    const nPts = 100;
+    const step = (leagueTrend.xMax - leagueTrend.xMin) / (nPts-1);
+    const xLine = Array.from({length:nPts}, (_,i) => leagueTrend.xMin + i*step);
+    const yLine = xLine.map(v => m*v + b);
+    traces.push({
+      x: xLine, y: yLine, type:'scatter', mode:'lines',
+      line:{color:'rgba(220,60,60,0.7)', width:2, dash:'dash'},
+      showlegend:false, hoverinfo:'skip', xaxis:'x2', yaxis:'y3',
+    });
+  }
+
+  const annotations = [];
+  if (leagueTrend) {
+    const {m, b, r2} = leagueTrend;
+    const sign = b >= 0 ? '+' : '-';
+    const eqText = `y = ${m.toFixed(3)}x ${sign} ${Math.abs(b).toFixed(3)}   R\u00B2 = ${r2.toFixed(3)}`;
+    annotations.push({
+      text: eqText,
+      xref:'x2', yref:'y3',
+      x: leagueTrend.xMin + (leagueTrend.xMax - leagueTrend.xMin)*0.02,
+      y: leagueTrend.yMax,
+      showarrow: false,
+      font:{size:12, color:'rgba(220,60,60,0.9)'},
+      bgcolor:'rgba(255,255,255,0.8)',
+    });
+  }
+
+  const layout = {
+    height: 700, width: 960,
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+    margin:{l:60, r:20, t:30, b:60}, bargap:0.06,
+    annotations: annotations,
+    xaxis:  {domain:[0,0.82], showticklabels:false, showgrid:false, matches:'x2'},
+    yaxis:  {domain:[0.82,1], showticklabels:false, showgrid:false},
+    xaxis2: {domain:[0,0.82], anchor:'y3', title:{text:friendlyPlayer(xCol), font:{size:13}}, showgrid:true, gridcolor:'#eee', zeroline:false, range:xRange},
+    yaxis3: {domain:[0,0.82], anchor:'x2', title:{text:friendlyPlayer(yCol), font:{size:13}}, showgrid:true, gridcolor:'#eee', zeroline:false, range:yRange},
+    xaxis4: {domain:[0.84,1], anchor:'y4', showticklabels:false, showgrid:false},
+    yaxis4: {domain:[0,0.82], showticklabels:false, showgrid:false, matches:'y3'},
+    xaxis3: {domain:[0.84,1], visible:false},
+    yaxis2: {domain:[0.82,1], visible:false},
+    shapes: [
+      {type:'line', xref:'x2 domain', yref:'y3', x0:0, x1:1, y0:yLeagueMean, y1:yLeagueMean, line:{dash:'dot', color:'#bbb', width:1}},
+      {type:'line', xref:'x2', yref:'y3 domain', x0:xLeagueMean, x1:xLeagueMean, y0:0, y1:1, line:{dash:'dot', color:'#bbb', width:1}},
+    ],
+  };
+
+  Plotly.react('player-chart', traces, layout, {displayModeBar: false});
+}
+
+/* ===================================================================
+   RATE VS EFFICIENCY EXPLORER
+   =================================================================== */
+function getRateCol(cat, prefix) { return prefix + cat.rate; }
+
+function getEffValues(data, cat, prefix) {
+  if (cat.eff !== null) {
+    const c = prefix + cat.eff;
+    return data.map(r => r[c]);
+  }
+  if (cat.eff_num === null) return null;
+  const numCol = prefix + cat.eff_num;
+  const denCol = prefix + cat.eff_den;
+  return data.map(r => {
+    const d = r[denCol];
+    if (!d || d === 0) return null;
+    return r[numCol] / d;
+  });
+}
+
+function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
+  const traces = [];
+  const shapes = [];
+  const isBoth = prefixes.length === 2;
+  let titleSide;
+  if (isBoth) titleSide = 'Offense & Defense';
+  else titleSide = prefixes[0] === 'opp_' ? 'Opponent' : 'Team';
+
+  // For connect-dots: collect per-team per-category points across prefixes
+  // Key: "team|catLabel" -> {off: {x,y}, opp: {x,y}}
+  const pairMap = {};
+
+  prefixes.forEach(prefix => {
+    const sideLabel = prefix === 'opp_' ? 'Opponent' : 'Team';
+    const pairKey = prefix === 'opp_' ? 'opp' : 'off';
+
+    categories.forEach(cat => {
+      const rateCol = getRateCol(cat, prefix);
+      const effVals = getEffValues(data, cat, prefix);
+      if (!effVals) return;
+      const x = [], y = [], text = [];
+      data.forEach((r, i) => {
+        if (isNumeric(r[rateCol]) && isNumeric(effVals[i])) {
+          x.push(r[rateCol]); y.push(effVals[i]); text.push(r.team_abbr);
+          if (isBoth && connectDots) {
+            const k = r.team_abbr + '|' + cat.label;
+            if (!pairMap[k]) pairMap[k] = {};
+            pairMap[k][pairKey] = {x: r[rateCol], y: effVals[i]};
+          }
+        }
+      });
+      const name = isBoth ? cat.label + ' (' + sideLabel + ')' : cat.label;
+      const markerOpts = {symbol: cat.symbol, size: 12, color: cat.color, line:{width:1, color:'black'}};
+      if (isBoth && prefix === 'opp_') {
+        markerOpts.color = 'white';
+        markerOpts.line = {width: 2, color: cat.color};
+      }
+      traces.push({
+        x, y, text, type:'scatter', mode:'markers+text', name: name,
+        textposition:'top center', textfont:{size:8},
+        marker: markerOpts,
+        hovertemplate: '<b>%{text}</b><br>' + name + '<br>Rate: %{x:.1f}/100<br>Efficiency: %{y:.2f}<extra></extra>',
+        legendgroup: isBoth ? cat.label + '_' + prefix : cat.label,
+      });
+
+      if (showAvg && x.length) {
+        const avgX = mean(x), avgY = mean(y);
+        shapes.push(
+          {type:'line', xref:'x', yref:'paper', x0:avgX, x1:avgX, y0:0, y1:1,
+           line:{dash:'dot', color:cat.color, width:1}, opacity:0.4},
+          {type:'line', xref:'paper', yref:'y', x0:0, x1:1, y0:avgY, y1:avgY,
+           line:{dash:'dot', color:cat.color, width:1}, opacity:0.4},
+        );
+      }
+    });
+  });
+
+  // Draw connecting lines between team/opponent pairs
+  if (isBoth && connectDots) {
+    // Group by category for consistent coloring
+    const catLines = {};
+    for (const [k, pts] of Object.entries(pairMap)) {
+      if (!pts.off || !pts.opp) continue;
+      const catLabel = k.split('|')[1];
+      if (!catLines[catLabel]) catLines[catLabel] = {x:[], y:[]};
+      catLines[catLabel].x.push(pts.off.x, pts.opp.x, null);
+      catLines[catLabel].y.push(pts.off.y, pts.opp.y, null);
+    }
+    for (const [catLabel, coords] of Object.entries(catLines)) {
+      const cat = CAT_BY_LABEL[catLabel];
+      traces.push({
+        x: coords.x, y: coords.y, type:'scatter', mode:'lines',
+        line:{color: cat.color, width:1, dash:'solid'},
+        opacity: 0.4, showlegend:false, hoverinfo:'skip',
+      });
+    }
+  }
+
+  const layout = {
+    title: 'Rate vs Efficiency (' + titleSide + ')',
+    xaxis: {title:'Per 100 Possessions', showgrid:true, gridcolor:'lightgray', gridwidth:1},
+    yaxis: {title:'Points Per Event', showgrid:true, gridcolor:'lightgray', gridwidth:1},
+    height:700, width:1100, showlegend:true,
+    legend:{yanchor:'top', y:0.99, xanchor:'left', x:1.02},
+    margin:{l:60, r:160, t:40, b:60},
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+    shapes: shapes,
+  };
+  Plotly.react('rate-chart', traces, layout, {displayModeBar: false});
+}
+
+function buildFaceted(data, prefixes) {
+  const cats = SHOT_CATEGORIES;
+  const isBoth = prefixes.length === 2;
+  let titleSide;
+  if (isBoth) titleSide = 'Offense & Defense';
+  else titleSide = prefixes[0] === 'opp_' ? 'Opponent' : 'Team';
+
+  // 2x2 grid positions
+  const positions = [
+    {xDom:[0,0.45], yDom:[0.56,1]},
+    {xDom:[0.55,1], yDom:[0.56,1]},
+    {xDom:[0,0.45], yDom:[0,0.44]},
+    {xDom:[0.55,1], yDom:[0,0.44]},
+  ];
+
+  const traces = [];
+  const shapes = [];
+  const annotations = [];
+  const layout = {
+    height:800, width:1100,
+    title: 'Shot Frequency vs Points Per Shot (' + titleSide + ')',
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+    showlegend: isBoth,
+  };
+  // For "both" legend: one entry per side (not per subplot)
+  const legendShown = {};
+
+  cats.forEach((cat, i) => {
+    const xAxis = 'x' + (i===0?'':i+1);
+    const yAxis = 'y' + (i===0?'':i+1);
+    const xRef = xAxis;
+    const yRef = yAxis;
+
+    prefixes.forEach(prefix => {
+      const sideLabel = prefix === 'opp_' ? 'Opponent' : 'Team';
+      const rateCol = getRateCol(cat, prefix);
+      const effVals = getEffValues(data, cat, prefix);
+      const x = [], y = [], text = [];
+      data.forEach((r, j) => {
+        if (isNumeric(r[rateCol]) && isNumeric(effVals[j])) {
+          x.push(r[rateCol]); y.push(effVals[j]); text.push(r.team_abbr);
+        }
+      });
+
+      const markerOpts = {size:10, color:cat.color, line:{width:1, color:'black'}};
+      if (isBoth && prefix === 'opp_') {
+        markerOpts.color = 'white';
+        markerOpts.line = {width:2, color:cat.color};
+      }
+
+      const legendKey = isBoth ? sideLabel : '';
+      const showInLegend = isBoth && !legendShown[legendKey];
+      if (showInLegend) legendShown[legendKey] = true;
+
+      traces.push({
+        x, y, text, type:'scatter', mode:'markers+text', name: sideLabel,
+        textposition:'top center', textfont:{size:8},
+        marker: markerOpts,
+        hovertemplate: '<b>%{text}</b><br>' + (isBoth ? sideLabel + '<br>' : '') + 'Frequency: %{x:.1f}/100<br>PPS: %{y:.2f}<extra></extra>',
+        showlegend: showInLegend,
+        legendgroup: isBoth ? sideLabel : undefined,
+        xaxis: xAxis, yaxis: yAxis,
+      });
+
+      // Crosshair averages
+      const avgRate = mean(x), avgEff = mean(y);
+      const lineColor = isBoth ? (prefix === 'opp_' ? cat.color : 'gray') : 'gray';
+      const lineDash = isBoth && prefix === 'opp_' ? 'dot' : 'dash';
+      shapes.push(
+        {type:'line', xref:xRef, yref:yRef+' domain', x0:avgRate, x1:avgRate, y0:0, y1:1, line:{dash:lineDash, color:lineColor, width:1}},
+        {type:'line', xref:xRef+' domain', yref:yRef, x0:0, x1:1, y0:avgEff, y1:avgEff, line:{dash:lineDash, color:lineColor, width:1}},
+      );
+    });
+
+    // Subplot title annotation
+    annotations.push({
+      text: '<b>' + cat.label + '</b>',
+      xref: xRef + ' domain', yref: yRef + ' domain',
+      x: 0.5, y: 1.08, showarrow: false, font:{size:14},
+    });
+
+    const axisIdx = i === 0 ? '' : (i+1);
+    layout['xaxis' + axisIdx] = {
+      domain: positions[i].xDom, anchor: yAxis,
+      showgrid:true, gridcolor:'lightgray', gridwidth:1,
+      title: i >= 2 ? {text:'Freq/100'} : undefined,
+    };
+    layout['yaxis' + axisIdx] = {
+      domain: positions[i].yDom, anchor: xAxis,
+      showgrid:true, gridcolor:'lightgray', gridwidth:1,
+      title: (i===0||i===2) ? {text:'PPS'} : undefined,
+    };
+  });
+
+  layout.shapes = shapes;
+  layout.annotations = annotations;
+  Plotly.react('rate-chart', traces, layout, {displayModeBar: false});
+}
+
+function updateRateChart() {
+  const view = document.querySelector('input[name="rate-view"]:checked').value;
+  const sideVal = document.querySelector('input[name="rate-side"]:checked').value;
+  const showAvg = document.getElementById('rate-show-avg').checked;
+  const connectDots = document.getElementById('rate-connect-dots').checked;
+
+  // Show/hide category container and options
+  const isUnfaceted = view === 'unfaceted';
+  document.getElementById('rate-category-container').style.display = isUnfaceted ? '' : 'none';
+  document.getElementById('rate-options-container').style.display = isUnfaceted ? '' : 'none';
+  // Connect team pairs only available when "Both" is selected
+  document.getElementById('rate-connect-label').style.display = (isUnfaceted && sideVal === 'both') ? '' : 'none';
+
+  if (view === 'faceted') {
+    const prefixes = sideVal === 'both' ? ['', 'opp_'] : [sideVal];
+    buildFaceted(seasonData, prefixes);
+  } else {
+    const checked = Array.from(document.querySelectorAll('#rate-categories input:checked')).map(cb => cb.value);
+    const cats = checked.map(lbl => CAT_BY_LABEL[lbl]).filter(Boolean);
+    if (!cats.length) {
+      Plotly.react('rate-chart', [], {
+        title:'Select at least one category', height:700,
+        plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+      });
+      return;
+    }
+    const prefixes = sideVal === 'both' ? ['', 'opp_'] : [sideVal];
+    buildUnfaceted(seasonData, cats, prefixes, showAvg, connectDots);
+  }
+}
+
+/* ===================================================================
+   INITIALIZATION
+   =================================================================== */
+function buildRateCategoryCheckboxes() {
+  const container = document.getElementById('rate-categories');
+  ALL_CATEGORIES.forEach(cat => {
+    if (cat.label === 'Blocks') return; // Skip Blocks (no efficiency)
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = cat.label;
+    // Default: shot categories checked
+    cb.checked = SHOT_CATEGORIES.some(s => s.label === cat.label);
+    cb.addEventListener('change', updateRateChart);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + cat.label));
+    container.appendChild(label);
+  });
+}
+
+async function init() {
+  buildRateCategoryCheckboxes();
+
+  // Load data
+  const [seasonResp, playerResp] = await Promise.all([
+    fetch('season_stats.json'),
+    fetch('player_stats.json'),
+  ]);
+  seasonData = await seasonResp.json();
+  playerData = await playerResp.json();
+
+  // Build season dropdowns
+  const seasonCols = getNumericCols(seasonData, SEASON_EXCLUDE);
+  const seasonX = document.getElementById('season-x');
+  const seasonY = document.getElementById('season-y');
+  populateSelect(seasonX, seasonCols, friendlySeason);
+  populateSelect(seasonY, seasonCols, friendlySeason);
+  seasonX.value = 'pts_per100';
+  seasonY.value = 'opp_pts_per100';
+  document.getElementById('season-stat-line').textContent =
+    `${seasonData[0].games} games loaded \u00B7 ${seasonData.length} teams \u00B7 ${seasonCols.length} variables`;
+
+  // Build player dropdowns
+  const playerCols = getNumericCols(playerData, PLAYER_EXCLUDE);
+  const playerX = document.getElementById('player-x');
+  const playerY = document.getElementById('player-y');
+  populateSelect(playerX, playerCols, friendlyPlayer);
+  populateSelect(playerY, playerCols, friendlyPlayer);
+  playerX.value = 'usage_pct';
+  playerY.value = 'ts_pct';
+
+  const teamSet = new Set(playerData.map(r => r.team_abbr));
+  const teams = Array.from(teamSet).sort();
+  const teamSel = document.getElementById('player-team');
+  const allOpt = document.createElement('option');
+  allOpt.value = 'ALL'; allOpt.textContent = 'All Teams';
+  teamSel.appendChild(allOpt);
+  teams.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    teamSel.appendChild(opt);
+  });
+
+  const defaultPoss = 200;
+  const qualPlayers = playerData.filter(r => r.poss_played >= defaultPoss);
+  document.getElementById('player-stat-line').textContent =
+    `${qualPlayers.length} players \u00B7 ${playerCols.length} variables`;
+
+  // Wire up event listeners
+  seasonX.addEventListener('change', updateSeasonChart);
+  seasonY.addEventListener('change', updateSeasonChart);
+  playerX.addEventListener('change', updatePlayerChart);
+  playerY.addEventListener('change', updatePlayerChart);
+  teamSel.addEventListener('change', updatePlayerChart);
+  document.getElementById('player-min-poss').addEventListener('change', updatePlayerChart);
+  document.querySelectorAll('input[name="rate-view"]').forEach(r => r.addEventListener('change', updateRateChart));
+  document.querySelectorAll('input[name="rate-side"]').forEach(r => r.addEventListener('change', updateRateChart));
+  document.getElementById('rate-show-avg').addEventListener('change', updateRateChart);
+  document.getElementById('rate-connect-dots').addEventListener('change', updateRateChart);
+
+  // Initial renders
+  updateSeasonChart();
+  updatePlayerChart();
+  updateRateChart();
+}
+
+init();
+</script>
+</body>
+</html>
