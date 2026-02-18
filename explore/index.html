@@ -154,22 +154,22 @@ h1 {
       <div>
         <label class="group-label">View</label>
         <div class="radio-group">
-          <label><input type="radio" name="rate-view" value="faceted" checked> Faceted (2x2 Shot Types)</label>
-          <label><input type="radio" name="rate-view" value="unfaceted"> Unfaceted (Overlay)</label>
+          <label><input type="radio" name="rate-view" value="faceted"> Faceted (2x2 Shot Types)</label>
+          <label><input type="radio" name="rate-view" value="unfaceted" checked> Unfaceted (Overlay)</label>
         </div>
       </div>
       <div>
         <label class="group-label">Side</label>
         <div class="radio-group">
-          <label><input type="radio" name="rate-side" value="" checked> Offense</label>
+          <label><input type="radio" name="rate-side" value=""> Offense</label>
           <label><input type="radio" name="rate-side" value="opp_"> Defense (opponent)</label>
-          <label><input type="radio" name="rate-side" value="both"> Both</label>
+          <label><input type="radio" name="rate-side" value="both" checked> Both</label>
         </div>
       </div>
-      <div id="rate-options-container" style="display:none">
+      <div id="rate-options-container">
         <label class="group-label">Options</label>
-        <label style="font-size:14px;cursor:pointer;display:block;padding:2px 0"><input type="checkbox" id="rate-show-avg"> Show averages</label>
-        <label style="font-size:14px;cursor:pointer;display:block;padding:2px 0" id="rate-connect-label"><input type="checkbox" id="rate-connect-dots"> Connect team pairs</label>
+        <label style="font-size:14px;cursor:pointer;display:block;padding:2px 0"><input type="checkbox" id="rate-show-avg" checked> Show averages</label>
+        <label style="font-size:14px;cursor:pointer;display:block;padding:2px 0" id="rate-connect-label"><input type="checkbox" id="rate-connect-dots" checked> Connect team pairs</label>
       </div>
       <div id="rate-category-container">
         <label class="group-label">Categories</label>
@@ -718,8 +718,9 @@ function buildRateCategoryCheckboxes() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.value = cat.label;
-    // Default: shot categories checked
-    cb.checked = SHOT_CATEGORIES.some(s => s.label === cat.label);
+    // Default: close, mid-range, 3-pointer checked
+    const defaultCats = new Set(['Close (\u22645ft)', 'Mid-Range', '3-Pointer']);
+    cb.checked = defaultCats.has(cat.label);
     cb.addEventListener('change', updateRateChart);
     label.appendChild(cb);
     label.appendChild(document.createTextNode(' ' + cat.label));
