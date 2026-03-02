@@ -106,6 +106,7 @@ h1 {
     <button class="tab-btn active" data-tab="season">Season Explorer</button>
     <button class="tab-btn" data-tab="player">Player Explorer</button>
     <button class="tab-btn" data-tab="rate">Rate vs Efficiency</button>
+    <button class="tab-btn" data-tab="matchup">Matchup</button>
   </div>
 
   <!-- ============ SEASON TAB ============ -->
@@ -177,6 +178,33 @@ h1 {
       </div>
     </div>
     <div id="rate-chart"></div>
+  </div>
+
+  <!-- ============ MATCHUP TAB ============ -->
+  <div id="tab-matchup" class="tab-panel">
+    <div class="rate-controls">
+      <div>
+        <label class="group-label">Team A</label>
+        <select id="matchup-team-a" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+      </div>
+      <div>
+        <label class="group-label">Team B</label>
+        <select id="matchup-team-b" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+      </div>
+      <div>
+        <label class="group-label">Side</label>
+        <div class="radio-group">
+          <label><input type="radio" name="matchup-side" value="team"> Team</label>
+          <label><input type="radio" name="matchup-side" value="opp"> Opponent</label>
+          <label><input type="radio" name="matchup-side" value="both" checked> Both</label>
+        </div>
+      </div>
+      <div>
+        <label class="group-label">Categories</label>
+        <div class="check-group" id="matchup-categories" style="display:inline-flex;flex-wrap:wrap;gap:4px 12px"></div>
+      </div>
+    </div>
+    <div id="matchup-chart"></div>
   </div>
 </div>
 
@@ -708,6 +736,238 @@ function updateRateChart() {
 }
 
 /* ===================================================================
+   MATCHUP EXPLORER
+   =================================================================== */
+const SHOOTING_CATS = new Set(['Close (\u22645ft)', 'Mid-Range', '3-Pointer', 'FT Trip']);
+const INVERTED_CATS = new Set(['Turnovers', 'Fouls']);
+const SHORT_NAME = {
+  'Close (\u22645ft)':'Close', 'Mid-Range':'Mid', '3-Pointer':'3PT', 'FT Trip':'FT',
+  'Turnovers':'TOV', 'Off. Rebounds':'OREB', 'Assists':'AST',
+  'Steals':'STL', 'Fouls':'PF', 'Fast Break':'FB', 'Clutch':'Clutch',
+};
+
+function getMatchupEff(row, cat, prefix) {
+  if (cat.eff !== null) return row[prefix + cat.eff];
+  if (cat.eff_num === null) return null;
+  const d = row[prefix + cat.eff_den];
+  return (d && d !== 0) ? row[prefix + cat.eff_num] / d : 0;
+}
+
+function advLine(catName, pa, pb, teamA, teamB) {
+  const short = SHORT_NAME[catName];
+  const diff = pa - pb;
+  if (Math.abs(diff) < 0.05) return short.padStart(6) + ': even (' + pa.toFixed(1) + ')';
+  let winner;
+  if (INVERTED_CATS.has(catName)) {
+    winner = diff > 0 ? teamB : teamA;
+  } else {
+    winner = diff > 0 ? teamA : teamB;
+  }
+  return short.padStart(6) + ': <b>' + winner + '</b> +' + Math.abs(diff).toFixed(1);
+}
+
+function updateMatchupChart() {
+  const teamA = document.getElementById('matchup-team-a').value;
+  const teamB = document.getElementById('matchup-team-b').value;
+  if (!teamA || !teamB) return;
+
+  const sideVal = document.querySelector('input[name="matchup-side"]:checked').value;
+  const prefixes = sideVal === 'team' ? [''] : sideVal === 'opp' ? ['opp_'] : ['', 'opp_'];
+  const showBoth = prefixes.length === 2;
+
+  const checked = Array.from(document.querySelectorAll('#matchup-categories input:checked')).map(cb => cb.value);
+  const activeCats = checked.map(lbl => CAT_BY_LABEL[lbl]).filter(Boolean);
+  if (!activeCats.length) {
+    Plotly.react('matchup-chart', [], {title:'Select at least one category', height:700, plot_bgcolor:'white', paper_bgcolor:'#fafafa'});
+    return;
+  }
+
+  const rowA = seasonData.find(r => r.team_abbr === teamA);
+  const rowB = seasonData.find(r => r.team_abbr === teamB);
+  if (!rowA || !rowB) return;
+
+  const traces = [];
+
+  // League-average crosshairs per category/prefix
+  prefixes.forEach(prefix => {
+    activeCats.forEach(cat => {
+      const rateCol = prefix + cat.rate;
+      const rateVals = seasonData.map(r => r[rateCol]).filter(isNumeric);
+      const avgRate = mean(rateVals);
+      const minRate = Math.min(...rateVals), maxRate = Math.max(...rateVals);
+
+      let effVals;
+      if (cat.eff !== null) {
+        effVals = seasonData.map(r => r[prefix + cat.eff]).filter(isNumeric);
+      } else if (cat.eff_num !== null) {
+        effVals = seasonData.map(r => {
+          const d = r[prefix + cat.eff_den];
+          return (d && d !== 0) ? r[prefix + cat.eff_num] / d : null;
+        }).filter(isNumeric);
+      } else {
+        return;
+      }
+      const avgEff = mean(effVals);
+      const minEff = Math.min(...effVals), maxEff = Math.max(...effVals);
+
+      // Vertical crosshair arm (rate = avg, eff spans min-to-max)
+      traces.push({
+        x: [avgRate, avgRate], y: [minEff, maxEff],
+        mode: 'lines', type: 'scatter',
+        line: {color: cat.color, width: 1, dash: 'dot'},
+        showlegend: false, hoverinfo: 'skip',
+      });
+      // Horizontal crosshair arm (eff = avg, rate spans min-to-max)
+      traces.push({
+        x: [minRate, maxRate], y: [avgEff, avgEff],
+        mode: 'lines', type: 'scatter',
+        line: {color: cat.color, width: 1, dash: 'dot'},
+        showlegend: false, hoverinfo: 'skip',
+      });
+    });
+  });
+
+  // Team markers
+  [{label: teamA, row: rowA}, {label: teamB, row: rowB}].forEach(({label, row}) => {
+    prefixes.forEach(prefix => {
+      const isOpp = prefix === 'opp_';
+      const textLabel = isOpp ? label + '_opp' : label;
+      const fill = !isOpp;
+      let first = true;
+      activeCats.forEach(cat => {
+        const r = row[prefix + cat.rate];
+        const e = getMatchupEff(row, cat, prefix);
+        if (!isNumeric(r) || !isNumeric(e)) return;
+        const p100 = r * e;
+        const markerOpts = {
+          size: 14, symbol: cat.symbol,
+          color: fill ? cat.color : 'white',
+          line: {width: 2, color: cat.color},
+        };
+        traces.push({
+          x: [r], y: [e], mode: 'markers+text', type: 'scatter',
+          marker: markerOpts,
+          text: [textLabel], textposition: 'top center', textfont: {size: 9},
+          name: first ? textLabel : undefined,
+          legendgroup: label + '_' + prefix,
+          showlegend: first,
+          hovertemplate: '<b>' + textLabel + '</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<br>Pts/100: ' + p100.toFixed(1) + '<extra></extra>',
+        });
+        first = false;
+      });
+    });
+  });
+
+  // Connecting lines + midpoint predictions (Both mode only)
+  const predA = {}, predB = {};
+  if (showBoth) {
+    [{offRow: rowA, oppRow: rowB, offLabel: teamA, defLabel: teamB, pred: predA},
+     {offRow: rowB, oppRow: rowA, offLabel: teamB, defLabel: teamA, pred: predB}].forEach(({offRow, oppRow, offLabel, defLabel, pred}) => {
+      let firstMid = true;
+      const midLegend = offLabel + ' pred';
+      activeCats.forEach(cat => {
+        const rOff = offRow[cat.rate];
+        const eOff = getMatchupEff(offRow, cat, '');
+        const rDef = oppRow['opp_' + cat.rate];
+        const eDef = getMatchupEff(oppRow, cat, 'opp_');
+        if (!isNumeric(rOff) || !isNumeric(eOff) || !isNumeric(rDef) || !isNumeric(eDef)) return;
+
+        // Dashed connecting line
+        traces.push({
+          x: [rOff, rDef], y: [eOff, eDef], mode: 'lines', type: 'scatter',
+          line: {color: cat.color, width: 1, dash: 'dash'},
+          showlegend: false, hoverinfo: 'skip',
+        });
+
+        // Midpoint prediction
+        const rMid = (rOff + rDef) / 2;
+        const eMid = (eOff + eDef) / 2;
+        const p100Mid = rMid * eMid;
+        pred[cat.label] = p100Mid;
+        traces.push({
+          x: [rMid], y: [eMid], mode: 'markers', type: 'scatter',
+          marker: {size: 10, color: cat.color, symbol: 'x-thin', line: {width: 2, color: cat.color}},
+          name: firstMid ? midLegend : undefined,
+          legendgroup: 'mid_' + offLabel,
+          showlegend: firstMid,
+          hovertemplate: '<b>' + offLabel + ' off vs ' + defLabel + ' def</b><br>' + cat.label + '<br>Pred Rate: ' + rMid.toFixed(1) + '<br>Pred Eff: ' + eMid.toFixed(3) + '<br>Pred Pts/100: ' + p100Mid.toFixed(1) + '<extra></extra>',
+        });
+        firstMid = false;
+      });
+    });
+  }
+
+  // Annotation box
+  const annotations = [];
+  if (showBoth && Object.keys(predA).length && Object.keys(predB).length) {
+    const activeNames = activeCats.map(c => c.label);
+    const shootingLines = [];
+    let sumA = 0, sumB = 0;
+    ALL_CATEGORIES.filter(c => SHOOTING_CATS.has(c.label)).forEach(c => {
+      if (!activeNames.includes(c.label)) return;
+      const pa = predA[c.label], pb = predB[c.label];
+      if (pa === undefined || pb === undefined) return;
+      sumA += pa; sumB += pb;
+      shootingLines.push(advLine(c.label, pa, pb, teamA, teamB));
+    });
+
+    const otherLines = [];
+    ALL_CATEGORIES.filter(c => !SHOOTING_CATS.has(c.label)).forEach(c => {
+      if (!activeNames.includes(c.label)) return;
+      const pa = predA[c.label], pb = predB[c.label];
+      if (pa === undefined || pb === undefined) return;
+      otherLines.push(advLine(c.label, pa, pb, teamA, teamB));
+    });
+
+    const lines = ['<b>Pred Pts/100 by Category</b>'];
+    if (shootingLines.length) {
+      lines.push(...shootingLines);
+      lines.push('');
+      lines.push('  <b>' + teamA + '</b> shooting: ' + sumA.toFixed(1));
+      lines.push('  <b>' + teamB + '</b> shooting: ' + sumB.toFixed(1));
+      const diffTotal = sumA - sumB;
+      if (Math.abs(diffTotal) >= 0.05) {
+        const winner = diffTotal > 0 ? teamA : teamB;
+        lines.push('  Edge: <b>' + winner + '</b> +' + Math.abs(diffTotal).toFixed(1));
+      }
+    }
+    if (otherLines.length) {
+      lines.push('');
+      lines.push(...otherLines);
+    }
+
+    annotations.push({
+      text: lines.join('<br>'),
+      xref: 'paper', yref: 'paper',
+      x: 0.98, y: 0.98,
+      xanchor: 'right', yanchor: 'top',
+      showarrow: false,
+      font: {size: 11, family: 'monospace'},
+      align: 'left',
+      bgcolor: 'rgba(255,255,255,0.85)',
+      bordercolor: '#ccc',
+      borderwidth: 1,
+      borderpad: 6,
+    });
+  }
+
+  const titleSide = showBoth ? 'Offense & Defense' : (prefixes[0] === 'opp_' ? 'Opponent' : 'Team');
+  const layout = {
+    title: teamA + ' vs ' + teamB + ' \u2014 Rate vs Efficiency (' + titleSide + ')',
+    xaxis: {title: 'Rate (per 100 possessions / frequency %)', showgrid: true, gridcolor: 'lightgray'},
+    yaxis: {title: 'Efficiency (points per event)', showgrid: true, gridcolor: 'lightgray'},
+    height: 700, width: 1100,
+    showlegend: true,
+    legend: {x: 1.02, y: 1, yanchor: 'top'},
+    margin: {l: 60, r: 160, t: 60, b: 60},
+    plot_bgcolor: 'white', paper_bgcolor: '#fafafa',
+    annotations: annotations,
+  };
+
+  Plotly.react('matchup-chart', traces, layout, {displayModeBar: false});
+}
+
+/* ===================================================================
    INITIALIZATION
    =================================================================== */
 function buildRateCategoryCheckboxes() {
@@ -728,8 +988,26 @@ function buildRateCategoryCheckboxes() {
   });
 }
 
+function buildMatchupCategoryCheckboxes() {
+  const container = document.getElementById('matchup-categories');
+  ALL_CATEGORIES.forEach(cat => {
+    if (cat.label === 'Blocks') return;
+    const label = document.createElement('label');
+    label.style.cssText = 'cursor:pointer;font-size:14px';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = cat.label;
+    cb.checked = true;
+    cb.addEventListener('change', updateMatchupChart);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + cat.label));
+    container.appendChild(label);
+  });
+}
+
 async function init() {
   buildRateCategoryCheckboxes();
+  buildMatchupCategoryCheckboxes();
 
   // Load data
   const [seasonResp, playerResp] = await Promise.all([
@@ -788,10 +1066,29 @@ async function init() {
   document.getElementById('rate-show-avg').addEventListener('change', updateRateChart);
   document.getElementById('rate-connect-dots').addEventListener('change', updateRateChart);
 
+  // Matchup dropdowns
+  const matchupTeams = Array.from(new Set(seasonData.map(r => r.team_abbr))).sort();
+  const matchupA = document.getElementById('matchup-team-a');
+  const matchupB = document.getElementById('matchup-team-b');
+  matchupTeams.forEach(t => {
+    const optA = document.createElement('option');
+    optA.value = t; optA.textContent = t;
+    matchupA.appendChild(optA);
+    const optB = document.createElement('option');
+    optB.value = t; optB.textContent = t;
+    matchupB.appendChild(optB);
+  });
+  matchupA.value = matchupTeams[0];
+  matchupB.value = matchupTeams[1] || matchupTeams[0];
+  matchupA.addEventListener('change', updateMatchupChart);
+  matchupB.addEventListener('change', updateMatchupChart);
+  document.querySelectorAll('input[name="matchup-side"]').forEach(r => r.addEventListener('change', updateMatchupChart));
+
   // Initial renders
   updateSeasonChart();
   updatePlayerChart();
   updateRateChart();
+  updateMatchupChart();
 }
 
 init();
