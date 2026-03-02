@@ -520,11 +520,19 @@ function buildContourTraces(allX, allY) {
       line: {color: 'rgba(180,180,180,0.4)', width: 1},
       showlegend: false, hoverinfo: 'skip',
     });
+    // Label on right edge
     annotations.push({
       x: xc[lastIdx], y: yc[lastIdx],
       text: String(k), showarrow: false,
       font: {size: 9, color: 'rgba(150,150,150,0.7)'},
       xshift: 12, yshift: 0,
+    });
+    // Label on left edge
+    annotations.push({
+      x: xc[0], y: yc[0],
+      text: String(k), showarrow: false,
+      font: {size: 9, color: 'rgba(150,150,150,0.7)'},
+      xshift: -12, yshift: 0,
     });
   }
   return {traces, annotations};
