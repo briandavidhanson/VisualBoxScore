@@ -153,13 +153,6 @@ h1 {
   <div id="tab-rate" class="tab-panel">
     <div class="rate-controls">
       <div>
-        <label class="group-label">View</label>
-        <div class="radio-group">
-          <label><input type="radio" name="rate-view" value="faceted"> Faceted (2x2 Shot Types)</label>
-          <label><input type="radio" name="rate-view" value="unfaceted" checked> Unfaceted (Overlay)</label>
-        </div>
-      </div>
-      <div>
         <label class="group-label">Side</label>
         <div class="radio-group">
           <label><input type="radio" name="rate-side" value=""> Offense</label>
@@ -497,6 +490,46 @@ function updatePlayerChart() {
 /* ===================================================================
    RATE VS EFFICIENCY EXPLORER
    =================================================================== */
+/* Build pts/100 contour traces (hyperbolas where rate*eff = k) */
+function buildContourTraces(allX, allY) {
+  const traces = [];
+  const annotations = [];
+  const xVals = allX.filter(isNumeric), yVals = allY.filter(isNumeric);
+  if (!xVals.length || !yVals.length) return {traces, annotations};
+  const xMin = Math.min(...xVals), xMax = Math.max(...xVals);
+  const yMin = Math.min(...yVals), yMax = Math.max(...yVals);
+  const xPad = (xMax - xMin) * 0.15, yPad = (yMax - yMin) * 0.15;
+  const xLo = Math.max(0.5, xMin - xPad), xHi = xMax + xPad;
+  const yLo = Math.max(0.01, yMin - yPad), yHi = yMax + yPad;
+  const p100Min = xLo * yLo, p100Max = xHi * yHi;
+  const step = 5;
+  const loLevel = Math.ceil(p100Min / step) * step;
+  const hiLevel = Math.floor(p100Max / step) * step;
+  const nPts = 200;
+  const xCurve = Array.from({length: nPts}, (_, i) => xLo + i * (xHi - xLo) / (nPts - 1));
+  for (let k = loLevel; k <= hiLevel + 0.1; k += step) {
+    const xc = [], yc = [];
+    let lastIdx = -1;
+    for (let i = 0; i < nPts; i++) {
+      const yv = k / xCurve[i];
+      if (yv >= yLo && yv <= yHi) { xc.push(xCurve[i]); yc.push(yv); lastIdx = xc.length - 1; }
+    }
+    if (!xc.length) continue;
+    traces.push({
+      x: xc, y: yc, mode: 'lines', type: 'scatter',
+      line: {color: 'rgba(180,180,180,0.4)', width: 1},
+      showlegend: false, hoverinfo: 'skip',
+    });
+    annotations.push({
+      x: xc[lastIdx], y: yc[lastIdx],
+      text: String(k), showarrow: false,
+      font: {size: 9, color: 'rgba(150,150,150,0.7)'},
+      xshift: 12, yshift: 0,
+    });
+  }
+  return {traces, annotations};
+}
+
 function getRateCol(cat, prefix) { return prefix + cat.rate; }
 
 function getEffValues(data, cat, prefix) {
@@ -515,12 +548,28 @@ function getEffValues(data, cat, prefix) {
 }
 
 function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
-  const traces = [];
   const shapes = [];
   const isBoth = prefixes.length === 2;
   let titleSide;
   if (isBoth) titleSide = 'Offense & Defense';
   else titleSide = prefixes[0] === 'opp_' ? 'Opponent' : 'Team';
+
+  // Collect all rate/eff for contour lines
+  const allRates = [], allEffs = [];
+  prefixes.forEach(prefix => {
+    categories.forEach(cat => {
+      const rateCol = getRateCol(cat, prefix);
+      const effVals = getEffValues(data, cat, prefix);
+      if (!effVals) return;
+      data.forEach((r, i) => {
+        if (isNumeric(r[rateCol]) && isNumeric(effVals[i])) {
+          allRates.push(r[rateCol]); allEffs.push(effVals[i]);
+        }
+      });
+    });
+  });
+  const contour = buildContourTraces(allRates, allEffs);
+  const traces = contour.traces.slice();
 
   // For connect-dots: collect per-team per-category points across prefixes
   // Key: "team|catLabel" -> {off: {x,y}, opp: {x,y}}
@@ -602,139 +651,30 @@ function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
     margin:{l:60, r:160, t:40, b:60},
     plot_bgcolor:'white', paper_bgcolor:'#fafafa',
     shapes: shapes,
+    annotations: contour.annotations,
   };
-  Plotly.react('rate-chart', traces, layout, {displayModeBar: false});
-}
-
-function buildFaceted(data, prefixes) {
-  const cats = SHOT_CATEGORIES;
-  const isBoth = prefixes.length === 2;
-  let titleSide;
-  if (isBoth) titleSide = 'Offense & Defense';
-  else titleSide = prefixes[0] === 'opp_' ? 'Opponent' : 'Team';
-
-  // 2x2 grid positions
-  const positions = [
-    {xDom:[0,0.45], yDom:[0.56,1]},
-    {xDom:[0.55,1], yDom:[0.56,1]},
-    {xDom:[0,0.45], yDom:[0,0.44]},
-    {xDom:[0.55,1], yDom:[0,0.44]},
-  ];
-
-  const traces = [];
-  const shapes = [];
-  const annotations = [];
-  const layout = {
-    height:800, width:1100,
-    title: 'Shot Frequency vs Points Per Shot (' + titleSide + ')',
-    plot_bgcolor:'white', paper_bgcolor:'#fafafa',
-    showlegend: isBoth,
-  };
-  // For "both" legend: one entry per side (not per subplot)
-  const legendShown = {};
-
-  cats.forEach((cat, i) => {
-    const xAxis = 'x' + (i===0?'':i+1);
-    const yAxis = 'y' + (i===0?'':i+1);
-    const xRef = xAxis;
-    const yRef = yAxis;
-
-    prefixes.forEach(prefix => {
-      const sideLabel = prefix === 'opp_' ? 'Opponent' : 'Team';
-      const rateCol = getRateCol(cat, prefix);
-      const effVals = getEffValues(data, cat, prefix);
-      const x = [], y = [], text = [], customdata = [];
-      data.forEach((r, j) => {
-        if (isNumeric(r[rateCol]) && isNumeric(effVals[j])) {
-          x.push(r[rateCol]); y.push(effVals[j]); text.push(r.team_abbr);
-          customdata.push([r[rateCol] * effVals[j]]);
-        }
-      });
-
-      const markerOpts = {size:10, color:cat.color, line:{width:1, color:'black'}};
-      if (isBoth && prefix === 'opp_') {
-        markerOpts.color = 'white';
-        markerOpts.line = {width:2, color:cat.color};
-      }
-
-      const legendKey = isBoth ? sideLabel : '';
-      const showInLegend = isBoth && !legendShown[legendKey];
-      if (showInLegend) legendShown[legendKey] = true;
-
-      traces.push({
-        x, y, text, customdata, type:'scatter', mode:'markers+text', name: sideLabel,
-        textposition:'top center', textfont:{size:8},
-        marker: markerOpts,
-        hovertemplate: '<b>%{text}</b><br>' + (isBoth ? sideLabel + '<br>' : '') + 'Frequency: %{x:.1f}/100<br>PPS: %{y:.2f}<br>Pts/100: %{customdata[0]:.1f}<extra></extra>',
-        showlegend: showInLegend,
-        legendgroup: isBoth ? sideLabel : undefined,
-        xaxis: xAxis, yaxis: yAxis,
-      });
-
-      // Crosshair averages
-      const avgRate = mean(x), avgEff = mean(y);
-      const lineColor = isBoth ? (prefix === 'opp_' ? cat.color : 'gray') : 'gray';
-      const lineDash = isBoth && prefix === 'opp_' ? 'dot' : 'dash';
-      shapes.push(
-        {type:'line', xref:xRef, yref:yRef+' domain', x0:avgRate, x1:avgRate, y0:0, y1:1, line:{dash:lineDash, color:lineColor, width:1}},
-        {type:'line', xref:xRef+' domain', yref:yRef, x0:0, x1:1, y0:avgEff, y1:avgEff, line:{dash:lineDash, color:lineColor, width:1}},
-      );
-    });
-
-    // Subplot title annotation
-    annotations.push({
-      text: '<b>' + cat.label + '</b>',
-      xref: xRef + ' domain', yref: yRef + ' domain',
-      x: 0.5, y: 1.08, showarrow: false, font:{size:14},
-    });
-
-    const axisIdx = i === 0 ? '' : (i+1);
-    layout['xaxis' + axisIdx] = {
-      domain: positions[i].xDom, anchor: yAxis,
-      showgrid:true, gridcolor:'lightgray', gridwidth:1,
-      title: i >= 2 ? {text:'Freq/100'} : undefined,
-    };
-    layout['yaxis' + axisIdx] = {
-      domain: positions[i].yDom, anchor: xAxis,
-      showgrid:true, gridcolor:'lightgray', gridwidth:1,
-      title: (i===0||i===2) ? {text:'PPS'} : undefined,
-    };
-  });
-
-  layout.shapes = shapes;
-  layout.annotations = annotations;
   Plotly.react('rate-chart', traces, layout, {displayModeBar: false});
 }
 
 function updateRateChart() {
-  const view = document.querySelector('input[name="rate-view"]:checked').value;
   const sideVal = document.querySelector('input[name="rate-side"]:checked').value;
   const showAvg = document.getElementById('rate-show-avg').checked;
   const connectDots = document.getElementById('rate-connect-dots').checked;
 
-  // Show/hide category container and options
-  const isUnfaceted = view === 'unfaceted';
-  document.getElementById('rate-category-container').style.display = isUnfaceted ? '' : 'none';
-  document.getElementById('rate-options-container').style.display = isUnfaceted ? '' : 'none';
   // Connect team pairs only available when "Both" is selected
-  document.getElementById('rate-connect-label').style.display = (isUnfaceted && sideVal === 'both') ? '' : 'none';
+  document.getElementById('rate-connect-label').style.display = sideVal === 'both' ? '' : 'none';
 
-  if (view === 'faceted') {
-    const prefixes = sideVal === 'both' ? ['', 'opp_'] : [sideVal];
-    buildFaceted(seasonData, prefixes);
-  } else {
-    const checked = Array.from(document.querySelectorAll('#rate-categories input:checked')).map(cb => cb.value);
-    const cats = checked.map(lbl => CAT_BY_LABEL[lbl]).filter(Boolean);
-    if (!cats.length) {
-      Plotly.react('rate-chart', [], {
-        title:'Select at least one category', height:700,
-        plot_bgcolor:'white', paper_bgcolor:'#fafafa',
-      });
-      return;
-    }
-    const prefixes = sideVal === 'both' ? ['', 'opp_'] : [sideVal];
-    buildUnfaceted(seasonData, cats, prefixes, showAvg, connectDots);
+  const checked = Array.from(document.querySelectorAll('#rate-categories input:checked')).map(cb => cb.value);
+  const cats = checked.map(lbl => CAT_BY_LABEL[lbl]).filter(Boolean);
+  if (!cats.length) {
+    Plotly.react('rate-chart', [], {
+      title:'Select at least one category', height:700,
+      plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+    });
+    return;
   }
+  const prefixes = sideVal === 'both' ? ['', 'opp_'] : [sideVal];
+  buildUnfaceted(seasonData, cats, prefixes, showAvg, connectDots);
 }
 
 /* ===================================================================
@@ -788,7 +728,19 @@ function updateMatchupChart() {
   const rowB = seasonData.find(r => r.team_abbr === teamB);
   if (!rowA || !rowB) return;
 
-  const traces = [];
+  // Contour lines
+  const allRates = [], allEffs = [];
+  prefixes.forEach(prefix => {
+    activeCats.forEach(cat => {
+      [rowA, rowB].forEach(row => {
+        const r = row[prefix + cat.rate];
+        const e = getMatchupEff(row, cat, prefix);
+        if (isNumeric(r) && isNumeric(e)) { allRates.push(r); allEffs.push(e); }
+      });
+    });
+  });
+  const contour = buildContourTraces(allRates, allEffs);
+  const traces = contour.traces.slice();
 
   // League-average crosshairs per category/prefix
   prefixes.forEach(prefix => {
@@ -963,7 +915,7 @@ function updateMatchupChart() {
     legend: {x: 1.02, y: 1, yanchor: 'top'},
     margin: {l: 60, r: 160, t: 60, b: 60},
     plot_bgcolor: 'white', paper_bgcolor: '#fafafa',
-    annotations: annotations,
+    annotations: annotations.concat(contour.annotations),
   };
 
   Plotly.react('matchup-chart', traces, layout, {displayModeBar: false});
@@ -992,6 +944,7 @@ function buildRateCategoryCheckboxes() {
 
 function buildMatchupCategoryCheckboxes() {
   const container = document.getElementById('matchup-categories');
+  const uncheckedByDefault = new Set(['Assists', 'Fouls', 'Clutch']);
   ALL_CATEGORIES.forEach(cat => {
     if (cat.label === 'Blocks') return;
     const label = document.createElement('label');
@@ -999,7 +952,7 @@ function buildMatchupCategoryCheckboxes() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.value = cat.label;
-    cb.checked = true;
+    cb.checked = !uncheckedByDefault.has(cat.label);
     cb.addEventListener('change', updateMatchupChart);
     label.appendChild(cb);
     label.appendChild(document.createTextNode(' ' + cat.label));
@@ -1063,7 +1016,6 @@ async function init() {
   playerY.addEventListener('change', updatePlayerChart);
   teamSel.addEventListener('change', updatePlayerChart);
   document.getElementById('player-min-poss').addEventListener('change', updatePlayerChart);
-  document.querySelectorAll('input[name="rate-view"]').forEach(r => r.addEventListener('change', updateRateChart));
   document.querySelectorAll('input[name="rate-side"]').forEach(r => r.addEventListener('change', updateRateChart));
   document.getElementById('rate-show-avg').addEventListener('change', updateRateChart);
   document.getElementById('rate-connect-dots').addEventListener('change', updateRateChart);
