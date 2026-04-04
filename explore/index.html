@@ -241,6 +241,20 @@ const ALL_CATEGORIES = SHOT_CATEGORIES.concat(EXTRA_CATEGORIES);
 const CAT_BY_LABEL = {};
 ALL_CATEGORIES.forEach(c => CAT_BY_LABEL[c.label] = c);
 
+// Empirical offense weights for rate prediction (OLS on 2025-26 season, n=1149 games).
+// 1.0 = pure offense, 0.0 = pure defense. Midpoint = 0.5.
+const RATE_WEIGHTS = {
+  'close_freq':        0.689,  // Close: offense 69%, defense 31%
+  'mid_freq':          0.818,  // Mid:   offense 82%, defense 18%
+  'three_freq':        0.788,  // 3pt:   offense 79%, defense 21%
+  'ft_trip_freq':      0.601,  // FT:    offense 60%, defense 40%
+  'stl_per100':        0.545,  // STL:   ~even
+  'tov_per100':        0.389,  // TOV:   defense 61% (defense-dominant)
+  'oreb_per100':       0.853,  // OREB:  offense 85%, defense 15%
+  'fb_poss_per100':    0.657,  // FB:    offense 66%, defense 34%
+};
+function rateWeight(rateCol) { return RATE_WEIGHTS[rateCol] ?? 0.5; }
+
 /* ===================================================================
    HELPERS
    =================================================================== */
@@ -841,18 +855,20 @@ function updateMatchupChart() {
           showlegend: false, hoverinfo: 'skip',
         });
 
-        // Midpoint prediction
-        const rMid = (rOff + rDef) / 2;
-        const eMid = (eOff + eDef) / 2;
-        const p100Mid = rMid * eMid;
-        pred[cat.label] = p100Mid;
+        // Weighted prediction: same empirical weight applied to both rate and efficiency
+        // so the prediction point stays on the line connecting offense and defense averages
+        const w = rateWeight(cat.rate);
+        const rPred    = w * rOff + (1 - w) * rDef;
+        const ePred    = w * eOff + (1 - w) * eDef;
+        const p100Pred = rPred * ePred;
+        pred[cat.label] = p100Pred;
         traces.push({
-          x: [rMid], y: [eMid], mode: 'markers', type: 'scatter',
+          x: [rPred], y: [ePred], mode: 'markers', type: 'scatter',
           marker: {size: 10, color: cat.color, symbol: 'x-thin', line: {width: 2, color: cat.color}},
           name: firstMid ? midLegend : undefined,
           legendgroup: 'mid_' + offLabel,
           showlegend: firstMid,
-          hovertemplate: '<b>' + offLabel + ' off vs ' + defLabel + ' def</b><br>' + cat.label + '<br>Pred Rate: ' + rMid.toFixed(1) + '<br>Pred Eff: ' + eMid.toFixed(3) + '<br>Pred Pts/100: ' + p100Mid.toFixed(1) + '<extra></extra>',
+          hovertemplate: '<b>' + offLabel + ' off vs ' + defLabel + ' def</b><br>' + cat.label + '<br>Pred Rate: ' + rPred.toFixed(1) + ' (off ' + Math.round(w * 100) + '%)<br>Pred Eff: ' + ePred.toFixed(3) + '<br>Pred Pts/100: ' + p100Pred.toFixed(1) + '<extra></extra>',
         });
         firstMid = false;
       });
@@ -911,6 +927,29 @@ function updateMatchupChart() {
       borderwidth: 1,
       borderpad: 6,
     });
+
+    // Separate small annotation for rate weights (bottom-left)
+    const wtParts = activeCats
+      .filter(c => RATE_WEIGHTS[c.rate] !== undefined)
+      .map(c => {
+        const short = c.label.replace(' (\u22645ft)','').replace('-Range','').replace('-Pointer','pt').replace('Off. ','');
+        return short + '\u00a0' + Math.round(RATE_WEIGHTS[c.rate] * 100) + '%';
+      });
+    if (wtParts.length) {
+      annotations.push({
+        text: 'pred off-wt: ' + wtParts.join(' \u00b7 '),
+        xref: 'paper', yref: 'paper',
+        x: 0.01, y: 0.01,
+        xanchor: 'left', yanchor: 'bottom',
+        showarrow: false,
+        font: {size: 10, family: 'monospace', color: '#999'},
+        align: 'left',
+        bgcolor: 'rgba(255,255,255,0.75)',
+        bordercolor: '#ddd',
+        borderwidth: 1,
+        borderpad: 4,
+      });
+    }
   }
 
   const titleSide = showBoth ? 'Offense & Defense' : (prefixes[0] === 'opp_' ? 'Opponent' : 'Team');
