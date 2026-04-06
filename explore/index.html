@@ -241,17 +241,17 @@ const ALL_CATEGORIES = SHOT_CATEGORIES.concat(EXTRA_CATEGORIES);
 const CAT_BY_LABEL = {};
 ALL_CATEGORIES.forEach(c => CAT_BY_LABEL[c.label] = c);
 
-// Empirical offense weights for rate prediction (OLS on 2025-26 season, n=1149 games).
-// 1.0 = pure offense, 0.0 = pure defense. Midpoint = 0.5.
+// Empirical offense weights — joint OLS constraining same w for rate & efficiency
+// (2025-26 season, n=1149 games). 1.0 = pure offense, 0.0 = pure defense.
 const RATE_WEIGHTS = {
-  'close_freq':        0.689,  // Close: offense 69%, defense 31%
-  'mid_freq':          0.818,  // Mid:   offense 82%, defense 18%
-  'three_freq':        0.788,  // 3pt:   offense 79%, defense 21%
-  'ft_trip_freq':      0.601,  // FT:    offense 60%, defense 40%
-  'stl_per100':        0.545,  // STL:   ~even
-  'tov_per100':        0.389,  // TOV:   defense 61% (defense-dominant)
-  'oreb_per100':       0.853,  // OREB:  offense 85%, defense 15%
-  'fb_poss_per100':    0.657,  // FB:    offense 66%, defense 34%
+  'close_freq':        0.553,  // Close: offense 55%, defense 45%
+  'mid_freq':          0.767,  // Mid:   offense 77%, defense 23%
+  'three_freq':        0.753,  // 3pt:   offense 75%, defense 25%
+  'ft_trip_freq':      0.676,  // FT:    offense 68%, defense 32%
+  'stl_per100':        0.503,  // STL:   ~even
+  'tov_per100':        0.432,  // TOV:   defense 57% (defense-dominant)
+  'oreb_per100':       0.703,  // OREB:  offense 70%, defense 30%
+  'fb_poss_per100':    0.566,  // FB:    offense 57%, defense 43%
 };
 function rateWeight(rateCol) { return RATE_WEIGHTS[rateCol] ?? 0.5; }
 
