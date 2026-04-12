@@ -1243,22 +1243,25 @@ function updateGameLogChart() {
 
       // Game dots
       if (showGames) {
-        const xs=[], ys=[], customdata=[], colors=[];
+        const xs=[], ys=[], customdata=[];
         const pctDiv = cat.pct_divisor;
         validRows.forEach(r => {
-          const wl = (r.result||'?')[0];
           xs.push(r[cat.rate]); ys.push(r[cat.eff]);
-          // filled = W for offense, L (opponent W) = bad for defense
-          const isFilled = hollow ? wl!=='W' : wl==='W';
-          colors.push(isFilled ? cat.color : 'white');
           const pts100 = (r[cat.rate]*r[cat.eff]).toFixed(1);
           const effPct = pctDiv ? ' ('+(r[cat.eff]/pctDiv*100).toFixed(1)+'%)' : '';
           const locStr = r.is_home ? 'vs' : '@';
           customdata.push([r.date, r.result, r.poss, effPct, pts100, r.opp, locStr, r.game_id]);
         });
-        traces.push({
+        const pinnedIdxs = _gameLogPinnedId
+          ? validRows.reduce((acc,r,i)=>{ if(r.game_id===_gameLogPinnedId) acc.push(i); return acc; }, [])
+          : null;
+        const gameDot = {
           x:xs, y:ys, mode:'markers', type:'scatter',
-          marker:{size:8, symbol:cat.symbol, color:colors, line:{width:hollow?2:0.8, color:hollow?cat.color:'black'}, opacity:0.45},
+          marker:{size:8, symbol:cat.symbol, color:hollow?'white':cat.color,
+                  line:{width:hollow?2:0.8, color:hollow?cat.color:'black'}, opacity:0.45},
+          selected:{marker:{size:12, opacity:1.0}},
+          unselected:{marker:{opacity:0.12}},
+          meta:{traceType:'game'},
           name:legendName, legendgroup:lg, showlegend:true,
           customdata,
           hovertemplate:'<b>'+team+' '+sideLabel+' \u2014 '+cat.label+'</b><br>'
@@ -1266,7 +1269,9 @@ function updateGameLogChart() {
             +'Rate: %{x:.1f}/100<br>'
             +'Efficiency: %{y:.3f}%{customdata[3]}<br>'
             +'Pts/100: %{customdata[4]}<extra></extra>',
-        });
+        };
+        if (pinnedIdxs !== null) gameDot.selectedpoints = pinnedIdxs;
+        traces.push(gameDot);
       }
 
       // Season average marker
@@ -1296,6 +1301,25 @@ function updateGameLogChart() {
           +'Pts/100: '+(meanR*meanE).toFixed(1)+'  '+pRankStr+'<extra></extra>',
       });
     });
+
+    // Connecting lines: off ↔ def for same game when "both" is selected
+    if (showOff && showDef && showGames) {
+      const offValid = offGames.filter(r => isNumeric(r[cat.rate]) && isNumeric(r[cat.eff]));
+      const offMap = {};
+      offValid.forEach(r => { offMap[r.game_id] = r; });
+      const lx=[], ly=[];
+      defGames.filter(r => isNumeric(r[cat.rate]) && isNumeric(r[cat.eff])).forEach(r => {
+        const o = offMap[r.game_id];
+        if (!o) return;
+        lx.push(o[cat.rate], r[cat.rate], null);
+        ly.push(o[cat.eff], r[cat.eff], null);
+      });
+      if (lx.length) traces.push({
+        x:lx, y:ly, mode:'lines', type:'scatter',
+        line:{color:cat.color, width:0.8, dash:'dot'},
+        opacity:0.3, showlegend:false, hoverinfo:'skip',
+      });
+    }
   });
 
   const contour = buildContourTraces(allX, allY);
@@ -1334,13 +1358,29 @@ function updateGameLogChart() {
     annotations:annotations.concat(contour.annotations),
   }, {displayModeBar:false});
 
+  // Helper: apply selectedpoints to all game traces
+  function _applyGameHighlight(gameId) {
+    const gd2 = document.getElementById('gamelog-chart');
+    const sps=[], idxs=[];
+    (gd2.data||[]).forEach((tr,i) => {
+      if (tr.meta && tr.meta.traceType==='game') {
+        idxs.push(i);
+        if (gameId) {
+          sps.push((tr.customdata||[]).reduce((acc,c,j)=>{ if(c[7]===gameId) acc.push(j); return acc; }, []));
+        } else {
+          sps.push(null);
+        }
+      }
+    });
+    if (idxs.length) Plotly.restyle('gamelog-chart', 'selectedpoints', sps, idxs);
+  }
+
   // Click-to-pin
-  el.removeEventListener('plotly_click', el._gameLogClick||null);
+  if (el._gameLogClick) el.removeListener('plotly_click', el._gameLogClick);
   el._gameLogClick = function(d) {
     if (!d || !d.points || !d.points[0]) return;
-    const pt = d.points[0];
-    const cd = pt.customdata;
-    if (!cd || !cd[7]) return; // not a game dot (no game_id)
+    const cd = d.points[0].customdata;
+    if (!cd || !cd[7]) return;
     const gameId = cd[7];
     if (_gameLogPinnedId === gameId) {
       _gameLogPinnedId = null;
@@ -1352,8 +1392,24 @@ function updateGameLogChart() {
       document.getElementById('gamelog-pinned-label').textContent =
         'Pinned: ' + cd[0] + '  ' + cd[6] + ' ' + cd[5] + '  ' + cd[1];
     }
+    _applyGameHighlight(_gameLogPinnedId);
   };
   el.on('plotly_click', el._gameLogClick);
+
+  // Hover dimming
+  if (el._gameLogHover) el.removeListener('plotly_hover', el._gameLogHover);
+  if (el._gameLogUnhover) el.removeListener('plotly_unhover', el._gameLogUnhover);
+  el._gameLogHover = function(d) {
+    if (!d || !d.points || !d.points[0]) return;
+    const cd = d.points[0].customdata;
+    if (!cd || !cd[7]) return;
+    _applyGameHighlight(cd[7]);
+  };
+  el._gameLogUnhover = function() {
+    _applyGameHighlight(_gameLogPinnedId);
+  };
+  el.on('plotly_hover', el._gameLogHover);
+  el.on('plotly_unhover', el._gameLogUnhover);
 }
 
 /* ===================================================================
