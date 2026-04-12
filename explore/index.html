@@ -1249,8 +1249,11 @@ function updateGameLogChart() {
           xs.push(r[cat.rate]); ys.push(r[cat.eff]);
           const pts100 = (r[cat.rate]*r[cat.eff]).toFixed(1);
           const effPct = pctDiv ? ' ('+(r[cat.eff]/pctDiv*100).toFixed(1)+'%)' : '';
-          const locStr = r.is_home ? 'vs' : '@';
-          customdata.push([r.date, r.result, r.poss, effPct, pts100, r.opp, locStr, r.game_id]);
+          // Defense rows: r.team is opponent, r.opp is our team, r.result/is_home are from opp POV
+          const result  = hollow ? (r.result==='W'?'L':r.result==='L'?'W':r.result) : r.result;
+          const oppName = hollow ? r.team : r.opp;
+          const locStr  = hollow ? (r.is_home?'@':'vs') : (r.is_home?'vs':'@');
+          customdata.push([r.date, result, r.poss, effPct, pts100, oppName, locStr, r.game_id]);
         });
         const pinnedIdxs = _gameLogPinnedId
           ? validRows.reduce((acc,r,i)=>{ if(r.game_id===_gameLogPinnedId) acc.push(i); return acc; }, [])
@@ -1302,27 +1305,28 @@ function updateGameLogChart() {
       });
     });
 
-    // Connecting lines: off ↔ def for same game when "both" is selected
-    if (showOff && showDef && showGames) {
-      const offValid = offGames.filter(r => isNumeric(r[cat.rate]) && isNumeric(r[cat.eff]));
-      const offMap = {};
-      offValid.forEach(r => { offMap[r.game_id] = r; });
-      const lx=[], ly=[];
-      defGames.filter(r => isNumeric(r[cat.rate]) && isNumeric(r[cat.eff])).forEach(r => {
-        const o = offMap[r.game_id];
-        if (!o) return;
-        lx.push(o[cat.rate], r[cat.rate], null);
-        ly.push(o[cat.eff], r[cat.eff], null);
-      });
-      if (lx.length) traces.push({
-        x:lx, y:ly, mode:'lines', type:'scatter',
-        line:{color:cat.color, width:0.8, dash:'dot'},
-        opacity:0.3, showlegend:false, hoverinfo:'skip',
+    // Connecting line: off ↔ def for the selected game only
+    if (showOff && showDef && showGames && _gameLogPinnedId) {
+      const oRow = offGames.find(r => r.game_id===_gameLogPinnedId && isNumeric(r[cat.rate]) && isNumeric(r[cat.eff]));
+      const dRow = defGames.find(r => r.game_id===_gameLogPinnedId && isNumeric(r[cat.rate]) && isNumeric(r[cat.eff]));
+      if (oRow && dRow) traces.push({
+        x:[oRow[cat.rate], dRow[cat.rate]],
+        y:[oRow[cat.eff],  dRow[cat.eff]],
+        mode:'lines', type:'scatter',
+        line:{color:cat.color, width:1.5},
+        opacity:0.7, showlegend:false, hoverinfo:'skip',
       });
     }
   });
 
   const contour = buildContourTraces(allX, allY);
+
+  // Explicit x range with generous right padding for contour labels
+  const _xv = allX.filter(isNumeric);
+  const _xMin = _xv.length ? Math.min(..._xv) : 0;
+  const _xMax = _xv.length ? Math.max(..._xv) : 100;
+  const _xPad = (_xMax - _xMin) * 0.15;
+  const xAxisRange = _xv.length ? [Math.max(0, _xMin - _xPad), _xMax + _xPad * 3] : undefined;
 
   // Rank annotation
   const annLines = ['<b>'+team+' Season Ranks</b>'];
@@ -1349,11 +1353,11 @@ function updateGameLogChart() {
     title:{text:team+' \u2014 per-game Rate vs Efficiency'
       +'<span style="font-size:12px;color:gray"> (contours = pts contributed / 100 poss)</span>',
       font:{size:15}},
-    xaxis:{title:'Per 100 Possessions', showgrid:true, gridcolor:'lightgray', zeroline:false},
+    xaxis:{title:'Per 100 Possessions', showgrid:true, gridcolor:'lightgray', zeroline:false, ...(xAxisRange?{range:xAxisRange}:{})},
     yaxis:{title:'Points Per Event', showgrid:true, gridcolor:'lightgray', zeroline:false},
     height:700, showlegend:true,
     legend:{orientation:'h', yanchor:'top', y:-0.12, xanchor:'center', x:0.5},
-    margin:{l:60, r:60, t:60, b:120},
+    margin:{l:60, r:80, t:60, b:120},
     plot_bgcolor:'white', paper_bgcolor:'#fafafa',
     annotations:annotations.concat(contour.annotations),
   }, {displayModeBar:false});
