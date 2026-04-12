@@ -107,6 +107,7 @@ h1 {
     <button class="tab-btn" data-tab="player">Player Explorer</button>
     <button class="tab-btn" data-tab="rate">Rate vs Efficiency</button>
     <button class="tab-btn" data-tab="matchup">Matchup</button>
+    <button class="tab-btn" data-tab="gamelog">Game Log</button>
   </div>
 
   <!-- ============ SEASON TAB ============ -->
@@ -177,19 +178,20 @@ h1 {
   <div id="tab-matchup" class="tab-panel">
     <div class="rate-controls">
       <div>
-        <label class="group-label">Team A</label>
-        <select id="matchup-team-a" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+        <label class="group-label">Away</label>
+        <select id="matchup-away" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
       </div>
       <div>
-        <label class="group-label">Team B</label>
-        <select id="matchup-team-b" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+        <label class="group-label">Home</label>
+        <select id="matchup-home" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
       </div>
       <div>
-        <label class="group-label">Side</label>
+        <label class="group-label">Ellipse</label>
         <div class="radio-group">
-          <label><input type="radio" name="matchup-side" value="team"> Team</label>
-          <label><input type="radio" name="matchup-side" value="opp"> Opponent</label>
-          <label><input type="radio" name="matchup-side" value="both" checked> Both</label>
+          <label><input type="radio" name="matchup-pct" value="0.50"> 50%</label>
+          <label><input type="radio" name="matchup-pct" value="0.68" checked> 68%</label>
+          <label><input type="radio" name="matchup-pct" value="0.80"> 80%</label>
+          <label><input type="radio" name="matchup-pct" value="0.95"> 95%</label>
         </div>
       </div>
       <div>
@@ -199,14 +201,48 @@ h1 {
     </div>
     <div id="matchup-chart"></div>
   </div>
+
+  <!-- ============ GAME LOG TAB ============ -->
+  <div id="tab-gamelog" class="tab-panel">
+    <div class="rate-controls">
+      <div>
+        <label class="group-label">Team</label>
+        <select id="gamelog-team" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+      </div>
+      <div>
+        <label class="group-label">Side</label>
+        <div class="radio-group">
+          <label><input type="radio" name="gamelog-side" value="off" checked> Offense</label>
+          <label><input type="radio" name="gamelog-side" value="def"> Defense</label>
+          <label><input type="radio" name="gamelog-side" value="both"> Both</label>
+        </div>
+      </div>
+      <div>
+        <label class="group-label">Ellipse</label>
+        <div class="radio-group">
+          <label><input type="radio" name="gamelog-pct" value="0"> Off</label>
+          <label><input type="radio" name="gamelog-pct" value="0.50"> 50%</label>
+          <label><input type="radio" name="gamelog-pct" value="0.68" checked> 68%</label>
+          <label><input type="radio" name="gamelog-pct" value="0.95"> 95%</label>
+        </div>
+      </div>
+      <div>
+        <label class="group-label">Categories</label>
+        <div class="check-group" id="gamelog-categories" style="display:inline-flex;flex-wrap:wrap;gap:4px 12px"></div>
+      </div>
+    </div>
+    <div id="gamelog-chart"></div>
+  </div>
 </div>
 
 <script>
 /* ===================================================================
    DATA & STATE
    =================================================================== */
-let seasonData = [];
-let playerData = [];
+let seasonData  = [];
+let playerData  = [];
+let ellipseData = null;
+let gameLogData = null;
 
 const SEASON_EXCLUDE = new Set([
   'team_abbr','team_name','games','home_games','away_games',
@@ -700,272 +736,333 @@ function updateRateChart() {
 }
 
 /* ===================================================================
-   MATCHUP EXPLORER
+   ELLIPSE PREDICTOR — shared constants + helpers
    =================================================================== */
-const SHOOTING_CATS = new Set(['Close (\u22645ft)', 'Mid-Range', '3-Pointer', 'FT Trip']);
-const INVERTED_CATS = new Set(['Turnovers', 'Fouls']);
-const SHORT_NAME = {
-  'Close (\u22645ft)':'Close', 'Mid-Range':'Mid', '3-Pointer':'3PT', 'FT Trip':'FT',
-  'Turnovers':'TOV', 'Off. Rebounds':'OREB', 'Assists':'AST',
-  'Steals':'STL', 'Fouls':'PF', 'Fast Break':'FB', 'Clutch':'Clutch',
+const ELLIPSE_CATEGORIES = [
+  {label:'Close (\u22645ft)', rate:'close_freq',    eff:'close_pps',    pct_divisor:2, color:'green',    symbol:'circle',        is_scoring:true},
+  {label:'Mid-Range',         rate:'mid_freq',       eff:'mid_pps',      pct_divisor:2, color:'blue',     symbol:'square',        is_scoring:true},
+  {label:'3-Pointer',         rate:'three_freq',     eff:'three_pps',    pct_divisor:3, color:'red',      symbol:'triangle-up',   is_scoring:true},
+  {label:'FT Trip',           rate:'ft_trip_freq',   eff:'ft_ppt',       pct_divisor:2, color:'purple',   symbol:'diamond',       is_scoring:true},
+  {label:'Steals',            rate:'stl_per100',     eff:'stl_ppe',                     color:'orange',   symbol:'star',          is_scoring:false},
+  {label:'Turnovers',         rate:'tov_per100',     eff:'tov_ppe',                     color:'brown',    symbol:'pentagon',      is_scoring:false, lower_is_better:true},
+  {label:'Off. Rebounds',     rate:'oreb_per100',    eff:'orb_ppe',                     color:'teal',     symbol:'hexagon',       is_scoring:false},
+  {label:'Assists',           rate:'ast_per100',     eff:'ast_ppe',                     color:'goldenrod',symbol:'cross',         is_scoring:false},
+  {label:'Fouls',             rate:'pf_per100',      eff:'pf_ppe',                      color:'hotpink',  symbol:'hourglass',     is_scoring:false, lower_is_better:true},
+  {label:'Fast Break',        rate:'fb_poss_per100', eff:'fb_ppe',                      color:'cyan',     symbol:'triangle-down', is_scoring:false},
+  {label:'Chances',           rate:'chances_freq',   eff:'chances_pps',                 color:'slategray',symbol:'asterisk',      is_scoring:false},
+];
+const ELLIPSE_CAT_BY_LABEL = {};
+ELLIPSE_CATEGORIES.forEach(c => ELLIPSE_CAT_BY_LABEL[c.label] = c);
+const ELLIPSE_DEFAULT        = new Set(['Close (\u22645ft)', 'Mid-Range', '3-Pointer']);
+const ELLIPSE_LOWER_IS_BETTER = new Set(['Turnovers', 'Fouls']);
+const ELLIPSE_SHORT = {
+  'Close (\u22645ft)':'Close','Mid-Range':'Mid','3-Pointer':'3PT','FT Trip':'FT',
+  'Steals':'STL','Turnovers':'TOV','Off. Rebounds':'OREB',
+  'Assists':'AST','Fouls':'PF','Fast Break':'FB','Chances':'Chances',
 };
+let ellipseModelMap = {};
 
-function getMatchupEff(row, cat, prefix) {
-  if (cat.eff !== null) return row[prefix + cat.eff];
-  if (cat.eff_num === null) return null;
-  const d = row[prefix + cat.eff_den];
-  return (d && d !== 0) ? row[prefix + cat.eff_num] / d : 0;
+function ellipsePredictCenter(offTeam, defTeam, isHome, cat) {
+  const model = ellipseModelMap[cat.rate + '+' + cat.eff];
+  if (!model || !ellipseData) return null;
+  const off = ellipseData.off_avgs[offTeam];
+  const def = ellipseData.def_avgs[defTeam];
+  if (!off || !def) return null;
+  const fv = [1, off[cat.rate], off[cat.eff], def[cat.rate], def[cat.eff], isHome];
+  if (fv.some(v => !isNumeric(v))) return null;
+  const predR = fv.reduce((s, v, i) => s + v * model.coef[i][0], 0);
+  const predE = fv.reduce((s, v, i) => s + v * model.coef[i][1], 0);
+  return [predR, predE];
 }
 
-function advLine(catName, pa, pb, teamA, teamB) {
-  const short = SHORT_NAME[catName];
-  const diff = pa - pb;
-  if (Math.abs(diff) < 0.05) return short.padStart(6) + ': even (' + pa.toFixed(1) + ')';
-  let winner;
-  if (INVERTED_CATS.has(catName)) {
-    winner = diff > 0 ? teamB : teamA;
-  } else {
-    winner = diff > 0 ? teamA : teamB;
+function ellipseXY(center, eigenvals, eigenvecs, scale) {
+  const n = 121, x = [], y = [];
+  const sq0 = Math.sqrt(scale * eigenvals[0]);
+  const sq1 = Math.sqrt(scale * eigenvals[1]);
+  for (let i = 0; i < n; i++) {
+    const t = 2 * Math.PI * i / (n - 1);
+    const c = Math.cos(t), s = Math.sin(t);
+    x.push(center[0] + eigenvecs[0][0]*sq0*c + eigenvecs[0][1]*sq1*s);
+    y.push(center[1] + eigenvecs[1][0]*sq0*c + eigenvecs[1][1]*sq1*s);
   }
-  return short.padStart(6) + ': <b>' + winner + '</b> +' + Math.abs(diff).toFixed(1);
+  return {x, y};
 }
+
+function normCDF(z) {
+  const sign = z < 0 ? -1 : 1, az = Math.abs(z);
+  const t = 1 / (1 + 0.3275911 * az);
+  const p = 1 - (((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-az*az/2);
+  return 0.5 * (1 + sign * p);
+}
+
+function ellipseWinProbAway(awayTeam, homeTeam) {
+  let meanDiff = 0, totalVar = 0;
+  ELLIPSE_CATEGORIES.filter(c => c.is_scoring).forEach(cat => {
+    const model = ellipseModelMap[cat.rate + '+' + cat.eff];
+    if (!model) return;
+    const ca = ellipsePredictCenter(awayTeam, homeTeam, 0, cat);
+    const ch = ellipsePredictCenter(homeTeam, awayTeam, 1, cat);
+    if (!ca || !ch) return;
+    const ev = model.eigenvals, evec = model.eigenvecs;
+    const cov00 = ev[0]*evec[0][0]*evec[0][0] + ev[1]*evec[0][1]*evec[0][1];
+    const cov11 = ev[0]*evec[1][0]*evec[1][0] + ev[1]*evec[1][1]*evec[1][1];
+    const cov01 = ev[0]*evec[0][0]*evec[1][0] + ev[1]*evec[0][1]*evec[1][1];
+    const tv = c => c[1]*c[1]*cov00 + c[0]*c[0]*cov11 + 2*c[0]*c[1]*cov01;
+    meanDiff += ca[0]*ca[1] - ch[0]*ch[1];
+    totalVar += tv(ca) + tv(ch);
+  });
+  if (totalVar < 1e-9) return 0.5;
+  return normCDF(meanDiff / Math.sqrt(totalVar));
+}
+
+function ellipseAdvLine(catLabel, pa, pb, awayTeam, homeTeam) {
+  const short  = ELLIPSE_SHORT[catLabel] || catLabel;
+  const padded = short.padStart(6).replace(/ /g, '\u00a0');
+  const diff   = pa - pb;
+  if (Math.abs(diff) < 0.05) return padded + ': even (' + Math.abs(diff).toFixed(1) + ')';
+  const winner = ELLIPSE_LOWER_IS_BETTER.has(catLabel)
+    ? (diff > 0 ? homeTeam : awayTeam)
+    : (diff > 0 ? awayTeam : homeTeam);
+  return padded + ': <b>' + winner + '</b> +' + Math.abs(diff).toFixed(1);
+}
+
+/* ===================================================================
+   MATCHUP EXPLORER (ELLIPSE PREDICTOR)
+   =================================================================== */
 
 function updateMatchupChart() {
-  const teamA = document.getElementById('matchup-team-a').value;
-  const teamB = document.getElementById('matchup-team-b').value;
-  if (!teamA || !teamB) return;
+  if (!ellipseData) return;
+  const awayTeam = document.getElementById('matchup-away').value;
+  const homeTeam = document.getElementById('matchup-home').value;
+  if (!awayTeam || !homeTeam) return;
 
-  const sideVal = document.querySelector('input[name="matchup-side"]:checked').value;
-  const prefixes = sideVal === 'team' ? [''] : sideVal === 'opp' ? ['opp_'] : ['', 'opp_'];
-  const showBoth = prefixes.length === 2;
-
-  const checked = Array.from(document.querySelectorAll('#matchup-categories input:checked')).map(cb => cb.value);
-  const activeCats = checked.map(lbl => CAT_BY_LABEL[lbl]).filter(Boolean);
+  const pctStr    = document.querySelector('input[name="matchup-pct"]:checked').value;
+  const checked   = Array.from(document.querySelectorAll('#matchup-categories input:checked')).map(cb => cb.value);
+  const activeCats = checked.map(lbl => ELLIPSE_CAT_BY_LABEL[lbl]).filter(Boolean);
   if (!activeCats.length) {
     Plotly.react('matchup-chart', [], {title:'Select at least one category', height:700, plot_bgcolor:'white', paper_bgcolor:'#fafafa'});
     return;
   }
 
-  const rowA = seasonData.find(r => r.team_abbr === teamA);
-  const rowB = seasonData.find(r => r.team_abbr === teamB);
-  if (!rowA || !rowB) return;
+  const traces = [], predAway = {}, predHome = {};
 
-  // Contour lines
-  const allRates = [], allEffs = [];
-  prefixes.forEach(prefix => {
-    activeCats.forEach(cat => {
-      [rowA, rowB].forEach(row => {
-        const r = row[prefix + cat.rate];
-        const e = getMatchupEff(row, cat, prefix);
-        if (isNumeric(r) && isNumeric(e)) { allRates.push(r); allEffs.push(e); }
-      });
-    });
-  });
-  const contour = buildContourTraces(allRates, allEffs);
-  const traces = contour.traces.slice();
+  activeCats.forEach(cat => {
+    const model  = ellipseModelMap[cat.rate + '+' + cat.eff];
+    if (!model) return;
+    const scale  = model.scales[pctStr];
+    const lgAvg  = ellipseData.league_avgs[cat.label];
+    const lgRng  = ellipseData.league_ranges[cat.label];
 
-  // League-average crosshairs per category/prefix
-  prefixes.forEach(prefix => {
-    activeCats.forEach(cat => {
-      const rateCol = prefix + cat.rate;
-      const rateVals = seasonData.map(r => r[rateCol]).filter(isNumeric);
-      const avgRate = mean(rateVals);
-      const minRate = Math.min(...rateVals), maxRate = Math.max(...rateVals);
+    // League-average crosshairs
+    if (lgAvg && lgRng) {
+      traces.push({x:[lgAvg.rate,lgAvg.rate], y:[lgRng.emin,lgRng.emax], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
+      traces.push({x:[lgRng.rmin,lgRng.rmax], y:[lgAvg.eff,lgAvg.eff], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
+    }
 
-      let effVals;
-      if (cat.eff !== null) {
-        effVals = seasonData.map(r => r[prefix + cat.eff]).filter(isNumeric);
-      } else if (cat.eff_num !== null) {
-        effVals = seasonData.map(r => {
-          const d = r[prefix + cat.eff_den];
-          return (d && d !== 0) ? r[prefix + cat.eff_num] / d : null;
-        }).filter(isNumeric);
-      } else {
-        return;
+    // Away attacks Home (is_home=0), Home attacks Away (is_home=1)
+    [
+      {off:awayTeam, def:homeTeam, isHome:0, teamLabel:awayTeam, predStore:predAway},
+      {off:homeTeam, def:awayTeam, isHome:1, teamLabel:homeTeam, predStore:predHome},
+    ].forEach(({off, def, isHome, teamLabel, predStore}) => {
+      const center = ellipsePredictCenter(off, def, isHome, cat);
+      if (!center) return;
+      predStore[cat.label] = center[0] * center[1];
+
+      if (scale !== undefined) {
+        const {x, y} = ellipseXY(center, model.eigenvals, model.eigenvecs, scale);
+        traces.push({x, y, mode:'lines', type:'scatter', line:{color:cat.color,width:1.5}, showlegend:false, hoverinfo:'skip'});
       }
-      const avgEff = mean(effVals);
-      const minEff = Math.min(...effVals), maxEff = Math.max(...effVals);
-
-      // Vertical crosshair arm (rate = avg, eff spans min-to-max)
+      const p100 = (center[0] * center[1]).toFixed(1);
       traces.push({
-        x: [avgRate, avgRate], y: [minEff, maxEff],
-        mode: 'lines', type: 'scatter',
-        line: {color: cat.color, width: 1, dash: 'dot'},
-        showlegend: false, hoverinfo: 'skip',
+        x:[center[0]], y:[center[1]], mode:'markers+text', type:'scatter',
+        marker:{size:12, symbol:cat.symbol, color:cat.color, line:{width:2, color:'white'}},
+        text:[teamLabel], textposition:'top center', textfont:{size:9},
+        name:cat.label + ' \u2014 ' + teamLabel,
+        legendgroup:teamLabel + '_' + cat.label,
+        showlegend:true,
+        hovertemplate:'<b>' + teamLabel + ' off</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<br>Pts/100: ' + p100 + '<extra></extra>',
       });
-      // Horizontal crosshair arm (eff = avg, rate spans min-to-max)
-      traces.push({
-        x: [minRate, maxRate], y: [avgEff, avgEff],
-        mode: 'lines', type: 'scatter',
-        line: {color: cat.color, width: 1, dash: 'dot'},
-        showlegend: false, hoverinfo: 'skip',
-      });
+      // Season avg (hollow)
+      const offAvgs = ellipseData.off_avgs[off];
+      if (offAvgs && isNumeric(offAvgs[cat.rate]) && isNumeric(offAvgs[cat.eff])) {
+        traces.push({
+          x:[offAvgs[cat.rate]], y:[offAvgs[cat.eff]], mode:'markers', type:'scatter',
+          marker:{size:8, symbol:cat.symbol, color:'white', line:{width:2, color:cat.color}},
+          showlegend:false,
+          hovertemplate:'<b>' + teamLabel + ' season avg</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<extra></extra>',
+        });
+      }
     });
   });
 
-  // Team markers
-  [{label: teamA, row: rowA}, {label: teamB, row: rowB}].forEach(({label, row}) => {
-    prefixes.forEach(prefix => {
-      const isOpp = prefix === 'opp_';
-      const textLabel = isOpp ? label + '_opp' : label;
-      const fill = !isOpp;
-      let first = true;
-      activeCats.forEach(cat => {
-        const r = row[prefix + cat.rate];
-        const e = getMatchupEff(row, cat, prefix);
-        if (!isNumeric(r) || !isNumeric(e)) return;
-        const p100 = r * e;
-        const markerOpts = {
-          size: 14, symbol: cat.symbol,
-          color: fill ? cat.color : 'white',
-          line: {width: 2, color: cat.color},
-        };
-        traces.push({
-          x: [r], y: [e], mode: 'markers+text', type: 'scatter',
-          marker: markerOpts,
-          text: [textLabel], textposition: 'top center', textfont: {size: 9},
-          name: first ? textLabel : undefined,
-          legendgroup: label + '_' + prefix,
-          showlegend: first,
-          hovertemplate: '<b>' + textLabel + '</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<br>Pts/100: ' + p100.toFixed(1) + '<extra></extra>',
-        });
-        first = false;
-      });
-    });
+  // Summary annotation
+  const annLines = ['<b>Pred Pts/100 by Category</b>'];
+  let sumAway = 0, sumHome = 0, hasScoring = false;
+  activeCats.filter(c => c.is_scoring).forEach(cat => {
+    const pa = predAway[cat.label], ph = predHome[cat.label];
+    if (pa === undefined || ph === undefined) return;
+    hasScoring = true; sumAway += pa; sumHome += ph;
+    annLines.push(ellipseAdvLine(cat.label, pa, ph, awayTeam, homeTeam));
   });
-
-  // Connecting lines + midpoint predictions (Both mode only)
-  const predA = {}, predB = {};
-  if (showBoth) {
-    [{offRow: rowA, oppRow: rowB, offLabel: teamA, defLabel: teamB, pred: predA},
-     {offRow: rowB, oppRow: rowA, offLabel: teamB, defLabel: teamA, pred: predB}].forEach(({offRow, oppRow, offLabel, defLabel, pred}) => {
-      let firstMid = true;
-      const midLegend = offLabel + ' pred';
-      activeCats.forEach(cat => {
-        const rOff = offRow[cat.rate];
-        const eOff = getMatchupEff(offRow, cat, '');
-        const rDef = oppRow['opp_' + cat.rate];
-        const eDef = getMatchupEff(oppRow, cat, 'opp_');
-        if (!isNumeric(rOff) || !isNumeric(eOff) || !isNumeric(rDef) || !isNumeric(eDef)) return;
-
-        // Dashed connecting line
-        traces.push({
-          x: [rOff, rDef], y: [eOff, eDef], mode: 'lines', type: 'scatter',
-          line: {color: cat.color, width: 1, dash: 'dash'},
-          showlegend: false, hoverinfo: 'skip',
-        });
-
-        // Weighted prediction: same empirical weight applied to both rate and efficiency
-        // so the prediction point stays on the line connecting offense and defense averages
-        const w = rateWeight(cat.rate);
-        const rPred    = w * rOff + (1 - w) * rDef;
-        const ePred    = w * eOff + (1 - w) * eDef;
-        const p100Pred = rPred * ePred;
-        pred[cat.label] = p100Pred;
-        traces.push({
-          x: [rPred], y: [ePred], mode: 'markers', type: 'scatter',
-          marker: {size: 10, color: cat.color, symbol: 'x-thin', line: {width: 2, color: cat.color}},
-          name: firstMid ? midLegend : undefined,
-          legendgroup: 'mid_' + offLabel,
-          showlegend: firstMid,
-          hovertemplate: '<b>' + offLabel + ' off vs ' + defLabel + ' def</b><br>' + cat.label + '<br>Pred Rate: ' + rPred.toFixed(1) + ' (off ' + Math.round(w * 100) + '%)<br>Pred Eff: ' + ePred.toFixed(3) + '<br>Pred Pts/100: ' + p100Pred.toFixed(1) + '<extra></extra>',
-        });
-        firstMid = false;
-      });
-    });
+  if (hasScoring) {
+    annLines.push('');
+    annLines.push('\u00a0\u00a0<b>' + awayTeam + '</b>: ' + sumAway.toFixed(1));
+    annLines.push('\u00a0\u00a0<b>' + homeTeam + '</b>: ' + sumHome.toFixed(1));
+    const diff = sumAway - sumHome;
+    if (Math.abs(diff) >= 0.05)
+      annLines.push('\u00a0\u00a0Edge: <b>' + (diff > 0 ? awayTeam : homeTeam) + '</b> +' + Math.abs(diff).toFixed(1));
+    const wp   = ellipseWinProbAway(awayTeam, homeTeam);
+    const fav  = wp >= 0.5 ? awayTeam : homeTeam;
+    annLines.push('\u00a0\u00a0Prob: <b>' + fav + '</b> ' + Math.round((wp >= 0.5 ? wp : 1 - wp) * 100) + '%');
+  }
+  const nonScoring = activeCats.filter(c => !c.is_scoring)
+    .filter(c => predAway[c.label] !== undefined && predHome[c.label] !== undefined);
+  if (nonScoring.length) {
+    annLines.push('');
+    nonScoring.forEach(cat => annLines.push(ellipseAdvLine(cat.label, predAway[cat.label], predHome[cat.label], awayTeam, homeTeam)));
   }
 
-  // Annotation box
   const annotations = [];
-  if (showBoth && Object.keys(predA).length && Object.keys(predB).length) {
-    const activeNames = activeCats.map(c => c.label);
-    const shootingLines = [];
-    let sumA = 0, sumB = 0;
-    ALL_CATEGORIES.filter(c => SHOOTING_CATS.has(c.label)).forEach(c => {
-      if (!activeNames.includes(c.label)) return;
-      const pa = predA[c.label], pb = predB[c.label];
-      if (pa === undefined || pb === undefined) return;
-      sumA += pa; sumB += pb;
-      shootingLines.push(advLine(c.label, pa, pb, teamA, teamB));
-    });
+  if (annLines.length > 1)
+    annotations.push({text:annLines.join('<br>'), xref:'paper', yref:'paper', x:0.98, y:0.98, xanchor:'right', yanchor:'top', showarrow:false, font:{size:11, family:'monospace'}, align:'left', bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#ccc', borderwidth:1, borderpad:6});
 
-    const otherLines = [];
-    ALL_CATEGORIES.filter(c => !SHOOTING_CATS.has(c.label)).forEach(c => {
-      if (!activeNames.includes(c.label)) return;
-      const pa = predA[c.label], pb = predB[c.label];
-      if (pa === undefined || pb === undefined) return;
-      otherLines.push(advLine(c.label, pa, pb, teamA, teamB));
-    });
+  Plotly.react('matchup-chart', traces, {
+    title: awayTeam + ' @ ' + homeTeam + ' \u2014 Ellipse Predictor (' + parseFloat(pctStr) * 100 + '% ellipse)',
+    xaxis:{title:'Rate (per 100 possessions)', showgrid:true, gridcolor:'lightgray'},
+    yaxis:{title:'Efficiency (pts per event)', showgrid:true, gridcolor:'lightgray'},
+    height:700, width:1100, showlegend:true,
+    legend:{x:1.02, y:1, yanchor:'top'},
+    margin:{l:60, r:160, t:60, b:60},
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa', annotations,
+  }, {displayModeBar:false});
+}
 
-    const lines = ['<b>Pred Pts/100 by Category</b>'];
-    if (shootingLines.length) {
-      lines.push(...shootingLines);
-      lines.push('');
-      lines.push('  <b>' + teamA + '</b> shooting: ' + sumA.toFixed(1));
-      lines.push('  <b>' + teamB + '</b> shooting: ' + sumB.toFixed(1));
-      const diffTotal = sumA - sumB;
-      if (Math.abs(diffTotal) >= 0.05) {
-        const winner = diffTotal > 0 ? teamA : teamB;
-        lines.push('  Edge: <b>' + winner + '</b> +' + Math.abs(diffTotal).toFixed(1));
-      }
-    }
-    if (otherLines.length) {
-      lines.push('');
-      lines.push(...otherLines);
-    }
+/* ===================================================================
+   GAME LOG
+   =================================================================== */
 
-    annotations.push({
-      text: lines.join('<br>'),
-      xref: 'paper', yref: 'paper',
-      x: 0.98, y: 0.98,
-      xanchor: 'right', yanchor: 'top',
-      showarrow: false,
-      font: {size: 11, family: 'monospace'},
-      align: 'left',
-      bgcolor: 'rgba(255,255,255,0.85)',
-      bordercolor: '#ccc',
-      borderwidth: 1,
-      borderpad: 6,
-    });
+function updateGameLogChart() {
+  if (!gameLogData || !ellipseData) return;
+  const team = document.getElementById('gamelog-team').value;
+  if (!team) return;
 
-    // Separate small annotation for rate weights (bottom-left)
-    const wtParts = activeCats
-      .filter(c => RATE_WEIGHTS[c.rate] !== undefined)
-      .map(c => {
-        const short = c.label.replace(' (\u22645ft)','').replace('-Range','').replace('-Pointer','pt').replace('Off. ','');
-        return short + '\u00a0' + Math.round(RATE_WEIGHTS[c.rate] * 100) + '%';
-      });
-    if (wtParts.length) {
-      annotations.push({
-        text: 'pred off-wt: ' + wtParts.join(' \u00b7 '),
-        xref: 'paper', yref: 'paper',
-        x: 0.01, y: 0.01,
-        xanchor: 'left', yanchor: 'bottom',
-        showarrow: false,
-        font: {size: 10, family: 'monospace', color: '#999'},
-        align: 'left',
-        bgcolor: 'rgba(255,255,255,0.75)',
-        bordercolor: '#ddd',
-        borderwidth: 1,
-        borderpad: 4,
-      });
-    }
+  const side      = document.querySelector('input[name="gamelog-side"]:checked').value;
+  const pctStr    = document.querySelector('input[name="gamelog-pct"]:checked').value;
+  const checked   = Array.from(document.querySelectorAll('#gamelog-categories input:checked')).map(cb => cb.value);
+  const activeCats = checked.map(lbl => ELLIPSE_CAT_BY_LABEL[lbl]).filter(Boolean);
+
+  if (!activeCats.length) {
+    Plotly.react('gamelog-chart', [], {title:'Select at least one category', height:700, plot_bgcolor:'white', paper_bgcolor:'#fafafa'});
+    return;
   }
 
-  const titleSide = showBoth ? 'Offense & Defense' : (prefixes[0] === 'opp_' ? 'Opponent' : 'Team');
-  const layout = {
-    title: teamA + ' vs ' + teamB + ' \u2014 Rate vs Efficiency (' + titleSide + ')',
-    xaxis: {title: 'Rate (per 100 possessions / frequency %)', showgrid: true, gridcolor: 'lightgray'},
-    yaxis: {title: 'Efficiency (points per event)', showgrid: true, gridcolor: 'lightgray'},
-    height: 700, width: 1100,
-    showlegend: true,
-    legend: {x: 1.02, y: 1, yanchor: 'top'},
-    margin: {l: 60, r: 160, t: 60, b: 60},
-    plot_bgcolor: 'white', paper_bgcolor: '#fafafa',
-    annotations: annotations.concat(contour.annotations),
-  };
+  const showOff = side === 'off' || side === 'both';
+  const showDef = side === 'def' || side === 'both';
+  const offGames = gameLogData.games.filter(r => r.team === team);
+  const defGames = gameLogData.games.filter(r => r.opp  === team);
+  const traces   = [];
 
-  Plotly.react('matchup-chart', traces, layout, {displayModeBar: false});
+  activeCats.forEach(cat => {
+    const lgAvg = gameLogData.league_avgs[cat.label];
+    const lgRng = gameLogData.league_ranges[cat.label];
+    if (lgAvg && lgRng) {
+      traces.push({x:[lgAvg.rate,lgAvg.rate], y:[lgRng.emin,lgRng.emax], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
+      traces.push({x:[lgRng.rmin,lgRng.rmax], y:[lgAvg.eff,lgAvg.eff], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
+    }
+
+    if (showOff) {
+      const xs=[], ys=[], texts=[], cols=[];
+      offGames.forEach(r => {
+        if (!isNumeric(r[cat.rate]) || !isNumeric(r[cat.eff])) return;
+        const wl = (r.result || '?')[0];
+        xs.push(r[cat.rate]); ys.push(r[cat.eff]);
+        texts.push(r.date + ' ' + (r.is_home ? 'vs' : '@') + ' ' + r.opp + ' (' + r.result + ')');
+        cols.push(wl === 'W' ? cat.color : 'white');
+      });
+      if (xs.length) traces.push({
+        x:xs, y:ys, mode:'markers', type:'scatter',
+        marker:{size:9, symbol:cat.symbol, color:cols, line:{width:2, color:cat.color}},
+        name:cat.label + (showDef ? ' off' : ''),
+        legendgroup:cat.label + '_off', showlegend:true,
+        text:texts,
+        hovertemplate:'<b>%{text}</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<extra></extra>',
+      });
+
+      // Season-avg ellipse for offense
+      if (pctStr !== '0') {
+        const model   = ellipseModelMap[cat.rate + '+' + cat.eff];
+        const seasAvg = ellipseData.off_avgs[team];
+        if (model && seasAvg && isNumeric(seasAvg[cat.rate]) && isNumeric(seasAvg[cat.eff])) {
+          const scale = model.scales[pctStr];
+          if (scale !== undefined) {
+            const {x, y} = ellipseXY([seasAvg[cat.rate], seasAvg[cat.eff]], model.eigenvals, model.eigenvecs, scale);
+            traces.push({x, y, mode:'lines', type:'scatter', line:{color:cat.color,width:1.5}, showlegend:false, hoverinfo:'skip'});
+          }
+        }
+      }
+    }
+
+    if (showDef) {
+      const xs=[], ys=[], texts=[], cols=[];
+      defGames.forEach(r => {
+        if (!isNumeric(r[cat.rate]) || !isNumeric(r[cat.eff])) return;
+        const wl = (r.result || '?')[0]; // opponent's result
+        xs.push(r[cat.rate]); ys.push(r[cat.eff]);
+        texts.push(r.date + ' ' + r.team + ' (' + r.result + ')');
+        // opponent W = team's defense allowed a win → hollow (bad)
+        cols.push(wl === 'W' ? 'white' : cat.color);
+      });
+      if (xs.length) traces.push({
+        x:xs, y:ys, mode:'markers', type:'scatter',
+        marker:{size:9, symbol:cat.symbol, color:cols, opacity:0.7, line:{width:2, color:cat.color}},
+        name:cat.label + (showOff ? ' def' : ''),
+        legendgroup:cat.label + '_def', showlegend:true,
+        text:texts,
+        hovertemplate:'<b>%{text}</b><br>' + cat.label + ' (opp)<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<extra></extra>',
+      });
+
+      // Season-avg ellipse for defense (what opponents produced)
+      if (pctStr !== '0') {
+        const model  = ellipseModelMap[cat.rate + '+' + cat.eff];
+        const defAvg = ellipseData.def_avgs[team];
+        if (model && defAvg && isNumeric(defAvg[cat.rate]) && isNumeric(defAvg[cat.eff])) {
+          const scale = model.scales[pctStr];
+          if (scale !== undefined) {
+            const {x, y} = ellipseXY([defAvg[cat.rate], defAvg[cat.eff]], model.eigenvals, model.eigenvecs, scale);
+            traces.push({x, y, mode:'lines', type:'scatter', line:{color:cat.color,width:1.5,dash:'dash'}, showlegend:false, hoverinfo:'skip'});
+          }
+        }
+      }
+    }
+  });
+
+  // Rank annotation
+  const annLines = ['<b>' + team + ' Season Ranks</b>'];
+  activeCats.forEach(cat => {
+    const key  = cat.rate + '+' + cat.eff;
+    const op   = ((gameLogData.off_p100_ranks || {})[key] || {})[team];
+    const dp   = ((gameLogData.def_p100_ranks || {})[key] || {})[team];
+    const short = (ELLIPSE_SHORT[cat.label] || cat.label).padStart(7).replace(/ /g, '\u00a0');
+    const parts = [];
+    if (op) parts.push('Off\u00a0#' + op);
+    if (dp) parts.push('Def\u00a0#' + dp);
+    if (parts.length) annLines.push(short + ': ' + parts.join(' '));
+  });
+
+  const annotations = [];
+  if (annLines.length > 1)
+    annotations.push({text:annLines.join('<br>'), xref:'paper', yref:'paper', x:0.98, y:0.98, xanchor:'right', yanchor:'top', showarrow:false, font:{size:11, family:'monospace'}, align:'left', bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#ccc', borderwidth:1, borderpad:6});
+
+  const sideLabel = side === 'off' ? 'Offense' : side === 'def' ? 'Defense' : 'Both';
+  Plotly.react('gamelog-chart', traces, {
+    title: team + ' Game Log \u2014 ' + sideLabel,
+    xaxis:{title:'Rate (per 100 possessions)', showgrid:true, gridcolor:'lightgray'},
+    yaxis:{title:'Efficiency (pts per event)', showgrid:true, gridcolor:'lightgray'},
+    height:700, width:1100, showlegend:true,
+    legend:{x:1.02, y:1, yanchor:'top'},
+    margin:{l:60, r:160, t:60, b:60},
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa', annotations,
+  }, {displayModeBar:false});
 }
 
 /* ===================================================================
@@ -974,12 +1071,11 @@ function updateMatchupChart() {
 function buildRateCategoryCheckboxes() {
   const container = document.getElementById('rate-categories');
   ALL_CATEGORIES.forEach(cat => {
-    if (cat.label === 'Blocks') return; // Skip Blocks (no efficiency)
+    if (cat.label === 'Blocks') return;
     const label = document.createElement('label');
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.value = cat.label;
-    // Default: close, mid-range, 3-pointer checked
     const defaultCats = new Set(['Close (\u22645ft)', 'Mid-Range', '3-Pointer']);
     cb.checked = defaultCats.has(cat.label);
     cb.addEventListener('change', updateRateChart);
@@ -989,18 +1085,17 @@ function buildRateCategoryCheckboxes() {
   });
 }
 
-function buildMatchupCategoryCheckboxes() {
-  const container = document.getElementById('matchup-categories');
-  const uncheckedByDefault = new Set(['Assists', 'Fouls', 'Clutch']);
-  ALL_CATEGORIES.forEach(cat => {
-    if (cat.label === 'Blocks') return;
+function buildEllipseCategoryCheckboxes(containerId, onChange, defaultSet) {
+  defaultSet = defaultSet || ELLIPSE_DEFAULT;
+  const container = document.getElementById(containerId);
+  ELLIPSE_CATEGORIES.forEach(cat => {
     const label = document.createElement('label');
     label.style.cssText = 'cursor:pointer;font-size:14px';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.value = cat.label;
-    cb.checked = !uncheckedByDefault.has(cat.label);
-    cb.addEventListener('change', updateMatchupChart);
+    cb.checked = defaultSet.has(cat.label);
+    cb.addEventListener('change', onChange);
     label.appendChild(cb);
     label.appendChild(document.createTextNode(' ' + cat.label));
     container.appendChild(label);
@@ -1009,17 +1104,26 @@ function buildMatchupCategoryCheckboxes() {
 
 async function init() {
   buildRateCategoryCheckboxes();
-  buildMatchupCategoryCheckboxes();
+  buildEllipseCategoryCheckboxes('matchup-categories', updateMatchupChart);
+  buildEllipseCategoryCheckboxes('gamelog-categories', updateGameLogChart);
 
-  // Load data
-  const [seasonResp, playerResp] = await Promise.all([
+  const [seasonResp, playerResp, ellipseResp, gameLogResp] = await Promise.all([
     fetch('season_stats.json'),
     fetch('player_stats.json'),
+    fetch('ellipse_model.json'),
+    fetch('game_log.json'),
   ]);
-  seasonData = await seasonResp.json();
-  playerData = await playerResp.json();
+  seasonData  = await seasonResp.json();
+  playerData  = await playerResp.json();
+  ellipseData = await ellipseResp.json();
+  gameLogData = await gameLogResp.json();
 
-  // Build season dropdowns
+  // Build ellipseModelMap
+  (ellipseData.categories || []).forEach(cat => {
+    ellipseModelMap[cat.rate + '+' + cat.eff] = cat;
+  });
+
+  // Season explorer
   const seasonCols = getNumericCols(seasonData, SEASON_EXCLUDE);
   const seasonX = document.getElementById('season-x');
   const seasonY = document.getElementById('season-y');
@@ -1030,7 +1134,7 @@ async function init() {
   document.getElementById('season-stat-line').textContent =
     `${seasonData[0].games} games loaded \u00B7 ${seasonData.length} teams \u00B7 ${seasonCols.length} variables`;
 
-  // Build player dropdowns
+  // Player explorer
   const playerCols = getNumericCols(playerData, PLAYER_EXCLUDE);
   const playerX = document.getElementById('player-x');
   const playerY = document.getElementById('player-y');
@@ -1039,24 +1143,23 @@ async function init() {
   playerX.value = 'usage_pct';
   playerY.value = 'ts_pct';
 
-  const teamSet = new Set(playerData.map(r => r.team_abbr));
-  const teams = Array.from(teamSet).sort();
+  const playerTeamSet = new Set(playerData.map(r => r.team_abbr));
+  const playerTeams   = Array.from(playerTeamSet).sort();
   const teamSel = document.getElementById('player-team');
-  const allOpt = document.createElement('option');
+  const allOpt  = document.createElement('option');
   allOpt.value = 'ALL'; allOpt.textContent = 'All Teams';
   teamSel.appendChild(allOpt);
-  teams.forEach(t => {
+  playerTeams.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t; opt.textContent = t;
     teamSel.appendChild(opt);
   });
 
-  const defaultPoss = 200;
-  const qualPlayers = playerData.filter(r => r.poss_played >= defaultPoss);
+  const qualPlayers = playerData.filter(r => r.poss_played >= 200);
   document.getElementById('player-stat-line').textContent =
     `${qualPlayers.length} players \u00B7 ${playerCols.length} variables`;
 
-  // Wire up event listeners
+  // Event listeners — Season / Player / Rate
   seasonX.addEventListener('change', updateSeasonChart);
   seasonY.addEventListener('change', updateSeasonChart);
   playerX.addEventListener('change', updatePlayerChart);
@@ -1067,29 +1170,42 @@ async function init() {
   document.getElementById('rate-show-avg').addEventListener('change', updateRateChart);
   document.getElementById('rate-connect-dots').addEventListener('change', updateRateChart);
 
-  // Matchup dropdowns
-  const matchupTeams = Array.from(new Set(seasonData.map(r => r.team_abbr))).sort();
-  const matchupA = document.getElementById('matchup-team-a');
-  const matchupB = document.getElementById('matchup-team-b');
-  matchupTeams.forEach(t => {
-    const optA = document.createElement('option');
-    optA.value = t; optA.textContent = t;
-    matchupA.appendChild(optA);
-    const optB = document.createElement('option');
-    optB.value = t; optB.textContent = t;
-    matchupB.appendChild(optB);
+  // Matchup dropdowns (from ellipseData.teams)
+  const ellipseTeams  = ellipseData.teams || [];
+  const matchupAway   = document.getElementById('matchup-away');
+  const matchupHome   = document.getElementById('matchup-home');
+  ellipseTeams.forEach(t => {
+    [matchupAway, matchupHome].forEach(sel => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      sel.appendChild(opt);
+    });
   });
-  matchupA.value = matchupTeams[0];
-  matchupB.value = matchupTeams[1] || matchupTeams[0];
-  matchupA.addEventListener('change', updateMatchupChart);
-  matchupB.addEventListener('change', updateMatchupChart);
-  document.querySelectorAll('input[name="matchup-side"]').forEach(r => r.addEventListener('change', updateMatchupChart));
+  matchupAway.value = ellipseTeams.includes('GSW') ? 'GSW' : ellipseTeams[0];
+  matchupHome.value = ellipseTeams.includes('BOS') ? 'BOS' : (ellipseTeams[1] || ellipseTeams[0]);
+  matchupAway.addEventListener('change', updateMatchupChart);
+  matchupHome.addEventListener('change', updateMatchupChart);
+  document.querySelectorAll('input[name="matchup-pct"]').forEach(r => r.addEventListener('change', updateMatchupChart));
+
+  // Game log dropdown
+  const gameLogTeams = [...new Set(gameLogData.games.map(r => r.team))].sort();
+  const gameLogSel   = document.getElementById('gamelog-team');
+  gameLogTeams.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    gameLogSel.appendChild(opt);
+  });
+  gameLogSel.value = gameLogTeams.includes('GSW') ? 'GSW' : gameLogTeams[0];
+  gameLogSel.addEventListener('change', updateGameLogChart);
+  document.querySelectorAll('input[name="gamelog-side"]').forEach(r => r.addEventListener('change', updateGameLogChart));
+  document.querySelectorAll('input[name="gamelog-pct"]').forEach(r => r.addEventListener('change', updateGameLogChart));
 
   // Initial renders
   updateSeasonChart();
   updatePlayerChart();
   updateRateChart();
   updateMatchupChart();
+  updateGameLogChart();
 }
 
 init();
