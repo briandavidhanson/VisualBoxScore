@@ -376,6 +376,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    // Resize charts that rendered while hidden (Plotly measures 0 width on display:none)
+    const resizeIds = {gamelog: 'gamelog-chart', matchup: 'matchup-chart'};
+    const cid = resizeIds[btn.dataset.tab];
+    if (cid) requestAnimationFrame(() => Plotly.relayout(cid, {autosize: true}));
   });
 });
 
@@ -1249,8 +1253,13 @@ function updateGameLogChart() {
           xs.push(r[cat.rate]); ys.push(r[cat.eff]);
           const pts100 = (r[cat.rate]*r[cat.eff]).toFixed(1);
           const effPct = pctDiv ? ' ('+(r[cat.eff]/pctDiv*100).toFixed(1)+'%)' : '';
-          // Defense rows: r.team is opponent, r.opp is our team, r.result/is_home are from opp POV
-          const result  = hollow ? (r.result==='W'?'L':r.result==='L'?'W':r.result) : r.result;
+          // Defense rows: r.result is from opp's POV — flip W/L and swap scores for our team
+          let result = r.result;
+          if (hollow && result) {
+            const wl = result[0]==='W'?'L':result[0]==='L'?'W':result[0];
+            const sc = result.slice(2).split('-');
+            result = wl + ' ' + (sc.length===2 ? sc[1]+'-'+sc[0] : result.slice(2));
+          }
           const oppName = hollow ? r.team : r.opp;
           const locStr  = hollow ? (r.is_home?'@':'vs') : (r.is_home?'vs':'@');
           customdata.push([r.date, result, r.poss, effPct, pts100, oppName, locStr, r.game_id]);
@@ -1396,7 +1405,7 @@ function updateGameLogChart() {
       document.getElementById('gamelog-pinned-label').textContent =
         'Pinned: ' + cd[0] + '  ' + cd[6] + ' ' + cd[5] + '  ' + cd[1];
     }
-    _applyGameHighlight(_gameLogPinnedId);
+    updateGameLogChart();
   };
   el.on('plotly_click', el._gameLogClick);
 
@@ -1576,11 +1585,16 @@ async function init() {
   });
   document.getElementById('gamelog-game-select').addEventListener('change', function() {
     const gid = this.value;
-    if (!gid) { _gameLogPinnedId = null; document.getElementById('gamelog-pinned-label').textContent = ''; return; }
-    _gameLogPinnedId = gid;
-    const r = gameLogData.games.find(g => g.game_id === gid && g.team === gameLogSel.value);
-    if (r) document.getElementById('gamelog-pinned-label').textContent =
-      'Pinned: ' + r.date + '  ' + (r.result||'') + ' ' + (r.is_home?'vs':'@') + ' ' + r.opp;
+    if (!gid) {
+      _gameLogPinnedId = null;
+      document.getElementById('gamelog-pinned-label').textContent = '';
+    } else {
+      _gameLogPinnedId = gid;
+      const r = gameLogData.games.find(g => g.game_id === gid && g.team === gameLogSel.value);
+      if (r) document.getElementById('gamelog-pinned-label').textContent =
+        'Pinned: ' + r.date + '  ' + (r.result||'') + ' ' + (r.is_home?'vs':'@') + ' ' + r.opp;
+    }
+    updateGameLogChart();
   });
   document.querySelectorAll('input[name="gamelog-side"]').forEach(r => r.addEventListener('change', updateGameLogChart));
   document.querySelectorAll('input[name="gamelog-pct"]').forEach(r => r.addEventListener('change', updateGameLogChart));
