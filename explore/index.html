@@ -933,7 +933,7 @@ function updateMatchupChart() {
   ];
 
   activeCats.forEach(cat => {
-    const model = ellipseModelMap[cat.rate + '+' + cat.eff];
+    const model = ellipseModelMap[cat.rate+'+'+cat.eff];
     if (!model) return;
     const lgAvg = ellipseData.league_avgs[cat.label];
     const lgRng = ellipseData.league_ranges[cat.label];
@@ -1059,13 +1059,25 @@ function updateMatchupChart() {
     });
   });
 
+  // Always fill scoring-cat predictions (annotation + score header always show all 4)
+  ELLIPSE_CATEGORIES.filter(c => c.is_scoring).forEach(cat => {
+    if (predAway[cat.label] != null) return;
+    attackers.forEach(({off, def, isHome, predStore}) => {
+      const center = ellipsePredictCenter(off, def, isHome, cat);
+      if (!center) return;
+      predStore[cat.label]      = center[0] * center[1];
+      predStore[cat.label+'_r'] = center[0].toFixed(1);
+      predStore[cat.label+'_e'] = center[1].toFixed(3);
+    });
+  });
+
   // Contour lines
   const contour = buildContourTraces(allX, allY);
 
   // In-chart annotation
   const annLines = ['<b>Pred Pts/100 by Category</b>'];
   let sumAway = 0, sumHome = 0, hasScoring = false;
-  activeCats.filter(c => c.is_scoring).forEach(cat => {
+  ELLIPSE_CATEGORIES.filter(c => c.is_scoring).forEach(cat => {
     const pa = predAway[cat.label], ph = predHome[cat.label];
     if (pa == null || ph == null) return;
     hasScoring = true; sumAway += pa; sumHome += ph;
