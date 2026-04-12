@@ -179,15 +179,16 @@ h1 {
     <div class="rate-controls">
       <div>
         <label class="group-label">Away</label>
-        <select id="matchup-away" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+        <select id="matchup-away" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:80px"></select>
       </div>
       <div>
         <label class="group-label">Home</label>
-        <select id="matchup-home" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+        <select id="matchup-home" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:80px"></select>
       </div>
       <div>
         <label class="group-label">Ellipse</label>
         <div class="radio-group">
+          <label><input type="radio" name="matchup-pct" value="0"> Off</label>
           <label><input type="radio" name="matchup-pct" value="0.50"> 50%</label>
           <label><input type="radio" name="matchup-pct" value="0.68" checked> 68%</label>
           <label><input type="radio" name="matchup-pct" value="0.80"> 80%</label>
@@ -195,11 +196,30 @@ h1 {
         </div>
       </div>
       <div>
+        <label class="group-label">Show avg</label>
+        <div class="radio-group">
+          <label><input type="radio" name="matchup-avg" value="none"> None</label>
+          <label><input type="radio" name="matchup-avg" value="offense"> Offense</label>
+          <label><input type="radio" name="matchup-avg" value="defense"> Defense</label>
+          <label><input type="radio" name="matchup-avg" value="both" checked> Both</label>
+        </div>
+      </div>
+      <div>
+        <label class="group-label">Show</label>
+        <div class="check-group" style="display:flex;flex-direction:column;gap:2px">
+          <label style="font-size:14px;cursor:pointer"><input type="checkbox" id="matchup-show-center" checked> Pred center</label>
+          <label style="font-size:14px;cursor:pointer"><input type="checkbox" id="matchup-show-delta" checked> Δ arrows</label>
+          <label style="font-size:14px;cursor:pointer"><input type="checkbox" id="matchup-show-games"> Game dots</label>
+        </div>
+      </div>
+      <div>
         <label class="group-label">Categories</label>
         <div class="check-group" id="matchup-categories" style="display:inline-flex;flex-wrap:wrap;gap:4px 12px"></div>
       </div>
     </div>
+    <div id="matchup-score-line" style="font-family:monospace;font-size:13px;color:#444;margin-bottom:6px;min-height:18px"></div>
     <div id="matchup-chart"></div>
+    <div id="matchup-table" style="margin-top:8px;overflow-x:auto"></div>
   </div>
 
   <!-- ============ GAME LOG TAB ============ -->
@@ -207,7 +227,7 @@ h1 {
     <div class="rate-controls">
       <div>
         <label class="group-label">Team</label>
-        <select id="gamelog-team" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:120px"></select>
+        <select id="gamelog-team" style="height:36px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:14px;width:80px"></select>
       </div>
       <div>
         <label class="group-label">Side</label>
@@ -227,9 +247,19 @@ h1 {
         </div>
       </div>
       <div>
+        <label class="group-label">Show</label>
+        <label style="font-size:14px;cursor:pointer"><input type="checkbox" id="gamelog-show-games" checked> Individual games</label>
+      </div>
+      <div>
         <label class="group-label">Categories</label>
         <div class="check-group" id="gamelog-categories" style="display:inline-flex;flex-wrap:wrap;gap:4px 12px"></div>
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+      <select id="gamelog-game-select" style="height:32px;border-radius:4px;border:1px solid #ccc;padding:0 8px;font-size:13px;width:300px;font-family:monospace">
+        <option value="">Select or click a game…</option>
+      </select>
+      <span id="gamelog-pinned-label" style="font-size:13px;color:#666;font-style:italic"></span>
     </div>
     <div id="gamelog-chart"></div>
   </div>
@@ -827,16 +857,61 @@ function ellipseAdvLine(catLabel, pa, pb, awayTeam, homeTeam) {
 }
 
 /* ===================================================================
+   HELPERS — color, ellipse, per-team covariance
+   =================================================================== */
+
+const CAT_RGB = {
+  green:'0,128,0', blue:'0,0,255', red:'255,0,0', purple:'128,0,128',
+  orange:'255,165,0', brown:'165,42,42', teal:'0,128,128',
+  goldenrod:'218,165,32', hotpink:'255,105,180', cyan:'0,255,255',
+  slategray:'112,128,144',
+};
+function catRgba(color, alpha) {
+  return 'rgba(' + (CAT_RGB[color] || '100,100,100') + ',' + alpha + ')';
+}
+
+/** Simple axis-aligned ellipse used by game-log (Dash app formula). */
+function axisEllipseXY(cx, cy, sx, sy, pct) {
+  const n = 121, x = [], y = [];
+  const nsd = Math.sqrt(-2 * Math.log(1 - pct));
+  for (let i = 0; i < n; i++) {
+    const t = 2 * Math.PI * i / (n - 1);
+    x.push(cx + nsd * sx * Math.cos(t));
+    y.push(cy + nsd * sy * Math.sin(t));
+  }
+  return {x, y};
+}
+
+/** Sum scoring-category pts/100 for one attacking team. */
+function predPts100(offTeam, defTeam, isHome) {
+  let pts = 0;
+  for (const cat of ELLIPSE_CATEGORIES) {
+    if (!cat.is_scoring) continue;
+    const c = ellipsePredictCenter(offTeam, defTeam, isHome, cat);
+    if (!c) return null;
+    pts += c[0] * c[1];
+  }
+  return pts;
+}
+
+/* ===================================================================
    MATCHUP EXPLORER (ELLIPSE PREDICTOR)
    =================================================================== */
 
 function updateMatchupChart() {
   if (!ellipseData) return;
-  const awayTeam = document.getElementById('matchup-away').value;
-  const homeTeam = document.getElementById('matchup-home').value;
+  const awayTeam  = document.getElementById('matchup-away').value;
+  const homeTeam  = document.getElementById('matchup-home').value;
   if (!awayTeam || !homeTeam) return;
 
   const pctStr    = document.querySelector('input[name="matchup-pct"]:checked').value;
+  const avgMode   = document.querySelector('input[name="matchup-avg"]:checked').value;
+  const showCenter = document.getElementById('matchup-show-center').checked;
+  const showDelta  = document.getElementById('matchup-show-delta').checked;
+  const showGames  = document.getElementById('matchup-show-games').checked;
+  const showOffGhost = avgMode === 'offense' || avgMode === 'both';
+  const showDefGhost = avgMode === 'defense' || avgMode === 'both';
+
   const checked   = Array.from(document.querySelectorAll('#matchup-categories input:checked')).map(cb => cb.value);
   const activeCats = checked.map(lbl => ELLIPSE_CAT_BY_LABEL[lbl]).filter(Boolean);
   if (!activeCats.length) {
@@ -844,111 +919,277 @@ function updateMatchupChart() {
     return;
   }
 
-  const traces = [], predAway = {}, predHome = {};
+  const traces = [], layoutAnnotations = [], predAway = {}, predHome = {};
+  const allX = [], allY = [];
+
+  // Away attacks Home (hollow/dotted), Home attacks Away (filled/solid)
+  const attackers = [
+    {off:awayTeam, def:homeTeam, isHome:0, label:awayTeam, hollow:true,  predStore:predAway},
+    {off:homeTeam, def:awayTeam, isHome:1, label:homeTeam, hollow:false, predStore:predHome},
+  ];
 
   activeCats.forEach(cat => {
-    const model  = ellipseModelMap[cat.rate + '+' + cat.eff];
+    const model = ellipseModelMap[cat.rate + '+' + cat.eff];
     if (!model) return;
-    const scale  = model.scales[pctStr];
-    const lgAvg  = ellipseData.league_avgs[cat.label];
-    const lgRng  = ellipseData.league_ranges[cat.label];
+    const lgAvg = ellipseData.league_avgs[cat.label];
+    const lgRng = ellipseData.league_ranges[cat.label];
 
-    // League-average crosshairs
+    // League-average crosshairs (shapes are more efficient but annotations work)
     if (lgAvg && lgRng) {
-      traces.push({x:[lgAvg.rate,lgAvg.rate], y:[lgRng.emin,lgRng.emax], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
-      traces.push({x:[lgRng.rmin,lgRng.rmax], y:[lgAvg.eff,lgAvg.eff], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
+      traces.push({x:[lgAvg.rate,lgAvg.rate], y:[lgRng.emin,lgRng.emax], mode:'lines', type:'scatter', line:{color:cat.color,width:2.5,dash:'dot'}, opacity:0.75, showlegend:false, hoverinfo:'skip'});
+      traces.push({x:[lgRng.rmin,lgRng.rmax], y:[lgAvg.eff,lgAvg.eff],   mode:'lines', type:'scatter', line:{color:cat.color,width:2.5,dash:'dot'}, opacity:0.75, showlegend:false, hoverinfo:'skip'});
     }
 
-    // Away attacks Home (is_home=0), Home attacks Away (is_home=1)
-    [
-      {off:awayTeam, def:homeTeam, isHome:0, teamLabel:awayTeam, predStore:predAway},
-      {off:homeTeam, def:awayTeam, isHome:1, teamLabel:homeTeam, predStore:predHome},
-    ].forEach(({off, def, isHome, teamLabel, predStore}) => {
+    attackers.forEach(({off, def, isHome, label, hollow, predStore}) => {
       const center = ellipsePredictCenter(off, def, isHome, cat);
       if (!center) return;
-      predStore[cat.label] = center[0] * center[1];
+      predStore[cat.label]       = center[0] * center[1];
+      predStore[cat.label+'_r']  = center[0].toFixed(1);
+      predStore[cat.label+'_e']  = center[1].toFixed(3);
+      allX.push(center[0]); allY.push(center[1]);
 
-      if (scale !== undefined) {
-        const {x, y} = ellipseXY(center, model.eigenvals, model.eigenvecs, scale);
-        traces.push({x, y, mode:'lines', type:'scatter', line:{color:cat.color,width:1.5}, showlegend:false, hoverinfo:'skip'});
+      // Ellipse
+      if (pctStr !== '0') {
+        const scale = model.scales[pctStr];
+        if (scale !== undefined) {
+          const {x, y} = ellipseXY(center, model.eigenvals, model.eigenvecs, scale);
+          allX.push(...x); allY.push(...y);
+          traces.push({
+            x, y, mode:'lines', type:'scatter',
+            line:{color:cat.color, width:hollow?1.8:2.5, dash:hollow?'dot':'solid'},
+            opacity:hollow?0.55:0.80,
+            fill:'toself', fillcolor:hollow?'rgba(0,0,0,0)':catRgba(cat.color,0.04),
+            legendgroup:label+'_'+cat.label, showlegend:false, hoverinfo:'skip',
+          });
+        }
       }
-      const p100 = (center[0] * center[1]).toFixed(1);
-      traces.push({
-        x:[center[0]], y:[center[1]], mode:'markers+text', type:'scatter',
-        marker:{size:12, symbol:cat.symbol, color:cat.color, line:{width:2, color:'white'}},
-        text:[teamLabel], textposition:'top center', textfont:{size:9},
-        name:cat.label + ' \u2014 ' + teamLabel,
-        legendgroup:teamLabel + '_' + cat.label,
-        showlegend:true,
-        hovertemplate:'<b>' + teamLabel + ' off</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<br>Pts/100: ' + p100 + '<extra></extra>',
-      });
-      // Season avg (hollow)
-      const offAvgs = ellipseData.off_avgs[off];
-      if (offAvgs && isNumeric(offAvgs[cat.rate]) && isNumeric(offAvgs[cat.eff])) {
+
+      // Predicted center
+      if (showCenter) {
+        const oos = model.oos && model.oos[pctStr];
+        const oosStr = oos != null ? (oos*100).toFixed(0)+'%' : 'n/a';
+        const pred_pts = (center[0]*center[1]).toFixed(1);
+        const homeStr = isHome ? 'home' : 'away';
         traces.push({
-          x:[offAvgs[cat.rate]], y:[offAvgs[cat.eff]], mode:'markers', type:'scatter',
-          marker:{size:8, symbol:cat.symbol, color:'white', line:{width:2, color:cat.color}},
-          showlegend:false,
-          hovertemplate:'<b>' + teamLabel + ' season avg</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<extra></extra>',
+          x:[center[0]], y:[center[1]], mode:'markers+text', type:'scatter',
+          marker:{size:14, symbol:cat.symbol, color:hollow?'white':cat.color,
+                  line:{width:2, color:hollow?cat.color:'black'}, opacity:1},
+          text:[label], textposition:'top center',
+          textfont:{size:9, color:cat.color},
+          name:cat.label+' \u2014 '+label,
+          legendgroup:label+'_'+cat.label, showlegend:true,
+          hovertemplate:'<b>'+label+' attacks ('+homeStr+') \u2014 '+cat.label+'</b><br>'+
+            'Predicted: '+center[0].toFixed(1)+'/100  '+center[1].toFixed(3)+' ppe  '+pred_pts+' pts/100<br>'+
+            'Ellipse: '+(parseFloat(pctStr)*100)+'%  OOS coverage: '+oosStr+'<extra></extra>',
+        });
+      }
+
+      // Offensive ghost (season avg for attacker)
+      const offAvg = ellipseData.off_avgs[off];
+      if (showOffGhost && offAvg && isNumeric(offAvg[cat.rate]) && isNumeric(offAvg[cat.eff])) {
+        const sAvg = [offAvg[cat.rate], offAvg[cat.eff]];
+        const dist = Math.hypot(center[0]-sAvg[0], center[1]-sAvg[1]);
+        if (dist > 1e-4) {
+          const s100 = (sAvg[0]*sAvg[1]).toFixed(1);
+          const pctD = cat.pct_divisor;
+          const effStr = pctD ? sAvg[1].toFixed(3)+' ('+(sAvg[1]/pctD*100).toFixed(1)+'%)' : sAvg[1].toFixed(3);
+          traces.push({
+            x:[sAvg[0]], y:[sAvg[1]], mode:'markers', type:'scatter',
+            marker:{size:10, symbol:cat.symbol, color:'white', line:{width:2,color:cat.color}, opacity:0.35},
+            legendgroup:label+'_'+cat.label, showlegend:false,
+            hovertemplate:'<b>'+off+' Offense avg \u2014 '+cat.label+'</b><br>'+
+              'Rate: '+sAvg[0].toFixed(1)+'/100<br>Efficiency: '+effStr+'<br>Pts/100: '+s100+'<extra></extra>',
+          });
+          if (showDelta) layoutAnnotations.push({
+            x:center[0], y:center[1], ax:sAvg[0], ay:sAvg[1],
+            xref:'x', yref:'y', axref:'x', ayref:'y',
+            showarrow:true, text:'', arrowhead:3, arrowsize:0.9, arrowwidth:1.8,
+            arrowcolor:cat.color, opacity:0.8,
+          });
+        }
+      }
+
+      // Defensive ghost (what opponents typically produce against defender)
+      const defAvg = ellipseData.def_avgs[def];
+      if (showDefGhost && defAvg && isNumeric(defAvg[cat.rate]) && isNumeric(defAvg[cat.eff])) {
+        const dAvg = [defAvg[cat.rate], defAvg[cat.eff]];
+        const dist = Math.hypot(center[0]-dAvg[0], center[1]-dAvg[1]);
+        if (dist > 1e-4) {
+          const d100 = (dAvg[0]*dAvg[1]).toFixed(1);
+          const pctD = cat.pct_divisor;
+          const dEffStr = pctD ? dAvg[1].toFixed(3)+' ('+(dAvg[1]/pctD*100).toFixed(1)+'%)' : dAvg[1].toFixed(3);
+          traces.push({
+            x:[dAvg[0]], y:[dAvg[1]], mode:'markers', type:'scatter',
+            marker:{size:8, symbol:cat.symbol, color:'white', line:{width:2,color:cat.color}, opacity:0.22},
+            legendgroup:label+'_'+cat.label, showlegend:false,
+            hovertemplate:'<b>'+def+' Defense avg \u2014 '+cat.label+'</b><br>'+
+              'Opp Rate: '+dAvg[0].toFixed(1)+'/100<br>Opp Efficiency: '+dEffStr+'<br>Opp Pts/100: '+d100+'<extra></extra>',
+          });
+          if (showDelta) layoutAnnotations.push({
+            x:center[0], y:center[1], ax:dAvg[0], ay:dAvg[1],
+            xref:'x', yref:'y', axref:'x', ayref:'y',
+            showarrow:true, text:'', arrowhead:3, arrowsize:0.8, arrowwidth:1.2,
+            arrowcolor:cat.color, opacity:0.5,
+          });
+        }
+      }
+
+      // Individual game dots (attacker's own games)
+      if (showGames) {
+        const gGames = gameLogData ? gameLogData.games.filter(r => r.team === off) : [];
+        const gx=[], gy=[], gt=[];
+        gGames.forEach(r => {
+          if (!isNumeric(r[cat.rate]) || !isNumeric(r[cat.eff])) return;
+          gx.push(r[cat.rate]); gy.push(r[cat.eff]);
+          gt.push(r.date);
+        });
+        if (gx.length) traces.push({
+          x:gx, y:gy, mode:'markers', type:'scatter',
+          marker:{size:7, symbol:cat.symbol, color:hollow?'white':cat.color,
+                  line:{width:1, color:cat.color}, opacity:0.45},
+          legendgroup:label+'_'+cat.label, showlegend:false,
+          text:gt,
+          hovertemplate:'<b>'+label+' \u2014 '+cat.label+'</b><br>%{text}<br>Rate: %{x:.1f}/100  Eff: %{y:.3f}<extra></extra>',
         });
       }
     });
   });
 
-  // Summary annotation
+  // Contour lines
+  const contour = buildContourTraces(allX, allY);
+
+  // In-chart annotation
   const annLines = ['<b>Pred Pts/100 by Category</b>'];
   let sumAway = 0, sumHome = 0, hasScoring = false;
   activeCats.filter(c => c.is_scoring).forEach(cat => {
     const pa = predAway[cat.label], ph = predHome[cat.label];
-    if (pa === undefined || ph === undefined) return;
+    if (pa == null || ph == null) return;
     hasScoring = true; sumAway += pa; sumHome += ph;
     annLines.push(ellipseAdvLine(cat.label, pa, ph, awayTeam, homeTeam));
   });
   if (hasScoring) {
     annLines.push('');
-    annLines.push('\u00a0\u00a0<b>' + awayTeam + '</b>: ' + sumAway.toFixed(1));
-    annLines.push('\u00a0\u00a0<b>' + homeTeam + '</b>: ' + sumHome.toFixed(1));
+    annLines.push('\u00a0\u00a0<b>'+awayTeam+'</b>: '+sumAway.toFixed(1));
+    annLines.push('\u00a0\u00a0<b>'+homeTeam+'</b>: '+sumHome.toFixed(1));
     const diff = sumAway - sumHome;
     if (Math.abs(diff) >= 0.05)
-      annLines.push('\u00a0\u00a0Edge: <b>' + (diff > 0 ? awayTeam : homeTeam) + '</b> +' + Math.abs(diff).toFixed(1));
-    const wp   = ellipseWinProbAway(awayTeam, homeTeam);
-    const fav  = wp >= 0.5 ? awayTeam : homeTeam;
-    annLines.push('\u00a0\u00a0Prob: <b>' + fav + '</b> ' + Math.round((wp >= 0.5 ? wp : 1 - wp) * 100) + '%');
+      annLines.push('\u00a0\u00a0Edge: <b>'+(diff>0?awayTeam:homeTeam)+'</b> +'+Math.abs(diff).toFixed(1));
+    const wp = ellipseWinProbAway(awayTeam, homeTeam);
+    const fav = wp >= 0.5 ? awayTeam : homeTeam;
+    annLines.push('\u00a0\u00a0Prob: <b>'+fav+'</b> '+Math.round((wp>=0.5?wp:1-wp)*100)+'%');
   }
   const nonScoring = activeCats.filter(c => !c.is_scoring)
-    .filter(c => predAway[c.label] !== undefined && predHome[c.label] !== undefined);
+    .filter(c => predAway[c.label] != null && predHome[c.label] != null);
   if (nonScoring.length) {
     annLines.push('');
     nonScoring.forEach(cat => annLines.push(ellipseAdvLine(cat.label, predAway[cat.label], predHome[cat.label], awayTeam, homeTeam)));
   }
+  layoutAnnotations.push({
+    text:annLines.join('<br>'), xref:'paper', yref:'paper', x:0.98, y:0.98,
+    xanchor:'right', yanchor:'top', showarrow:false,
+    font:{size:11, family:'monospace'}, align:'left',
+    bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#ccc', borderwidth:1, borderpad:6,
+  });
 
-  const annotations = [];
-  if (annLines.length > 1)
-    annotations.push({text:annLines.join('<br>'), xref:'paper', yref:'paper', x:0.98, y:0.98, xanchor:'right', yanchor:'top', showarrow:false, font:{size:11, family:'monospace'}, align:'left', bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#ccc', borderwidth:1, borderpad:6});
-
-  Plotly.react('matchup-chart', traces, {
-    title: awayTeam + ' @ ' + homeTeam + ' \u2014 Ellipse Predictor (' + parseFloat(pctStr) * 100 + '% ellipse)',
-    xaxis:{title:'Rate (per 100 possessions)', showgrid:true, gridcolor:'lightgray'},
-    yaxis:{title:'Efficiency (pts per event)', showgrid:true, gridcolor:'lightgray'},
-    height:700, width:1100, showlegend:true,
-    legend:{x:1.02, y:1, yanchor:'top'},
-    margin:{l:60, r:160, t:60, b:60},
-    plot_bgcolor:'white', paper_bgcolor:'#fafafa', annotations,
+  const pctNum = parseFloat(pctStr) * 100;
+  const titleNote = ' solid='+homeTeam+' \u00b7 dotted='+awayTeam+' \u00b7 '+(pctNum||'no')+' ellipse';
+  Plotly.react('matchup-chart', contour.traces.concat(traces), {
+    title:{text:awayTeam+' @ '+homeTeam+' \u2014 Matchup-Adjusted Predictive Ellipses'
+      +'<span style="font-size:11px;color:gray"> '+titleNote+'</span>',
+      font:{size:14}},
+    xaxis:{title:'Rate per 100 possessions', showgrid:true, gridcolor:'lightgray', zeroline:false},
+    yaxis:{title:'Points per event', showgrid:true, gridcolor:'lightgray', zeroline:false},
+    height:700, showlegend:true,
+    legend:{orientation:'h', yanchor:'top', y:-0.12, xanchor:'center', x:0.5},
+    margin:{l:60, r:60, t:70, b:120},
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+    annotations:layoutAnnotations.concat(contour.annotations),
   }, {displayModeBar:false});
+
+  // Score/pace header
+  const awayPts100 = predPts100(awayTeam, homeTeam, 0);
+  const homePts100 = predPts100(homeTeam, awayTeam, 1);
+  const scoreEl = document.getElementById('matchup-score-line');
+  if (awayPts100 != null && homePts100 != null && gameLogData) {
+    const pace = team => {
+      const gs = gameLogData.games.filter(r => r.team === team && r.poss > 0);
+      return gs.length ? gs.reduce((s,r) => s+r.poss, 0) / gs.length : 97;
+    };
+    const avgPace = (pace(awayTeam) + pace(homeTeam)) / 2;
+    const awayGame = awayPts100 * avgPace / 100;
+    const homeGame = homePts100 * avgPace / 100;
+    const wp = ellipseWinProbAway(awayTeam, homeTeam);
+    const fav = wp >= 0.5 ? awayTeam : homeTeam;
+    scoreEl.innerHTML = awayTeam+'&nbsp;&nbsp;'+awayGame.toFixed(1)+'&nbsp;&nbsp;\u2014&nbsp;&nbsp;'+homeGame.toFixed(1)+'&nbsp;&nbsp;'+homeTeam
+      +'&nbsp;&nbsp;&nbsp;(pts/100:&nbsp;'+awayPts100.toFixed(1)+' vs '+homePts100.toFixed(1)
+      +' &nbsp;\u00b7&nbsp; ~'+avgPace.toFixed(0)+' poss/game)'
+      +'&nbsp;&nbsp;&nbsp;\u00b7&nbsp;&nbsp;&nbsp;<b>'+fav+'</b>&nbsp;win prob&nbsp;'+Math.round((wp>=0.5?wp:1-wp)*100)+'%';
+  } else {
+    scoreEl.textContent = '';
+  }
+
+  // Data table
+  const tableEl = document.getElementById('matchup-table');
+  const thresh = parseFloat(pctStr);
+  const tableRows = [];
+  activeCats.forEach(cat => {
+    const pa = predAway[cat.label], ph = predHome[cat.label];
+    if (pa == null && ph == null) return;
+    const model = ellipseModelMap[cat.rate+'+'+cat.eff];
+    const oos = model && model.oos && model.oos[pctStr];
+    const oosStr = oos != null ? (oos*100).toFixed(0)+'%' : '\u2014';
+    const adv = (pa != null && ph != null) ? pa - ph : null;
+    const advStr = adv != null ? (adv>=0?'+':'')+adv.toFixed(1) : '\u2014';
+    const advColor = adv==null?'#555':adv>0.3?'green':adv<-0.3?'red':'#555';
+    const oosDelta = oos != null ? oos - thresh : null;
+    const oosColor = oosDelta==null?'#555':oosDelta>=-0.05?'green':oosDelta>=-0.15?'darkorange':'red';
+    tableRows.push('<tr>'
+      +'<td style="padding:3px 10px;font-weight:bold;color:'+cat.color+'">'+cat.label+'</td>'
+      +'<td style="padding:3px 10px;text-align:right">'+(pa!=null?(predAway[cat.label+'_r']||'\u2014'):'\u2014')+'</td>'
+      +'<td style="padding:3px 10px;text-align:right">'+(pa!=null?(predAway[cat.label+'_e']||'\u2014'):'\u2014')+'</td>'
+      +'<td style="padding:3px 10px;text-align:right">'+(pa!=null?pa.toFixed(1):'\u2014')+'</td>'
+      +'<td style="padding:3px 10px;text-align:right">'+(ph!=null?(predHome[cat.label+'_r']||'\u2014'):'\u2014')+'</td>'
+      +'<td style="padding:3px 10px;text-align:right">'+(ph!=null?(predHome[cat.label+'_e']||'\u2014'):'\u2014')+'</td>'
+      +'<td style="padding:3px 10px;text-align:right">'+(ph!=null?ph.toFixed(1):'\u2014')+'</td>'
+      +'<td style="padding:3px 10px;text-align:right;color:'+advColor+';font-weight:'+(adv!=null&&Math.abs(adv)>0.5?'bold':'normal')+'">'+advStr+'</td>'
+      +'<td style="padding:3px 10px;text-align:right;color:'+oosColor+'">'+oosStr+'</td>'
+      +'</tr>');
+  });
+  if (tableRows.length) {
+    const pctLbl = thresh ? (thresh*100).toFixed(0)+'%' : '\u2014';
+    tableEl.innerHTML = '<table style="border-collapse:collapse;font-size:12px">'
+      +'<tr style="border-bottom:2px solid #bbb;font-size:11px">'
+      +'<th style="padding:4px 10px;text-align:left">Category</th>'
+      +'<th style="padding:4px 10px;text-align:right">'+awayTeam+' rate</th>'
+      +'<th style="padding:4px 10px;text-align:right">eff</th>'
+      +'<th style="padding:4px 10px;text-align:right">pts/100</th>'
+      +'<th style="padding:4px 10px;text-align:right">'+homeTeam+' rate</th>'
+      +'<th style="padding:4px 10px;text-align:right">eff</th>'
+      +'<th style="padding:4px 10px;text-align:right">pts/100</th>'
+      +'<th style="padding:4px 10px;text-align:right">'+awayTeam+' adv</th>'
+      +'<th style="padding:4px 10px;text-align:right">OOS '+pctLbl+'</th>'
+      +'</tr>'+tableRows.join('')+'</table>'
+      +'<p style="font-size:11px;color:#888;margin-top:4px">pts/100 = rate \u00d7 eff \u00b7 '
+      +awayTeam+' adv = away\u2212home \u00b7 green \u2265 target\u22125pp \u00b7 orange \u2265\u221215pp \u00b7 red &lt;\u221215pp</p>';
+  } else {
+    tableEl.innerHTML = '';
+  }
 }
 
 /* ===================================================================
    GAME LOG
    =================================================================== */
+let _gameLogPinnedId = null;
 
 function updateGameLogChart() {
   if (!gameLogData || !ellipseData) return;
   const team = document.getElementById('gamelog-team').value;
   if (!team) return;
 
-  const side      = document.querySelector('input[name="gamelog-side"]:checked').value;
-  const pctStr    = document.querySelector('input[name="gamelog-pct"]:checked').value;
-  const checked   = Array.from(document.querySelectorAll('#gamelog-categories input:checked')).map(cb => cb.value);
+  const side       = document.querySelector('input[name="gamelog-side"]:checked').value;
+  const pctStr     = document.querySelector('input[name="gamelog-pct"]:checked').value;
+  const showGames  = document.getElementById('gamelog-show-games').checked;
+  const checked    = Array.from(document.querySelectorAll('#gamelog-categories input:checked')).map(cb => cb.value);
   const activeCats = checked.map(lbl => ELLIPSE_CAT_BY_LABEL[lbl]).filter(Boolean);
 
   if (!activeCats.length) {
@@ -960,109 +1201,159 @@ function updateGameLogChart() {
   const showDef = side === 'def' || side === 'both';
   const offGames = gameLogData.games.filter(r => r.team === team);
   const defGames = gameLogData.games.filter(r => r.opp  === team);
-  const traces   = [];
+  const N = (ellipseData.teams || []).length || 30;
+
+  const traces = [], allX = [], allY = [];
 
   activeCats.forEach(cat => {
     const lgAvg = gameLogData.league_avgs[cat.label];
     const lgRng = gameLogData.league_ranges[cat.label];
     if (lgAvg && lgRng) {
-      traces.push({x:[lgAvg.rate,lgAvg.rate], y:[lgRng.emin,lgRng.emax], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
-      traces.push({x:[lgRng.rmin,lgRng.rmax], y:[lgAvg.eff,lgAvg.eff], mode:'lines', type:'scatter', line:{color:cat.color,width:1,dash:'dot'}, showlegend:false, hoverinfo:'skip'});
+      traces.push({x:[lgAvg.rate,lgAvg.rate], y:[lgRng.emin,lgRng.emax], mode:'lines', type:'scatter', line:{color:cat.color,width:2.5,dash:'dot'}, opacity:0.75, showlegend:false, hoverinfo:'skip'});
+      traces.push({x:[lgRng.rmin,lgRng.rmax], y:[lgAvg.eff,lgAvg.eff],   mode:'lines', type:'scatter', line:{color:cat.color,width:2.5,dash:'dot'}, opacity:0.75, showlegend:false, hoverinfo:'skip'});
     }
 
-    if (showOff) {
-      const xs=[], ys=[], texts=[], cols=[];
-      offGames.forEach(r => {
-        if (!isNumeric(r[cat.rate]) || !isNumeric(r[cat.eff])) return;
-        const wl = (r.result || '?')[0];
-        xs.push(r[cat.rate]); ys.push(r[cat.eff]);
-        texts.push(r.date + ' ' + (r.is_home ? 'vs' : '@') + ' ' + r.opp + ' (' + r.result + ')');
-        cols.push(wl === 'W' ? cat.color : 'white');
-      });
-      if (xs.length) traces.push({
-        x:xs, y:ys, mode:'markers', type:'scatter',
-        marker:{size:9, symbol:cat.symbol, color:cols, line:{width:2, color:cat.color}},
-        name:cat.label + (showDef ? ' off' : ''),
-        legendgroup:cat.label + '_off', showlegend:true,
-        text:texts,
-        hovertemplate:'<b>%{text}</b><br>' + cat.label + '<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<extra></extra>',
-      });
+    const sides = [];
+    if (showOff) sides.push({key:'off', rows:offGames, hollow:false, sideLabel:'Offense'});
+    if (showDef) sides.push({key:'def', rows:defGames, hollow:true,  sideLabel:'Defense'});
 
-      // Season-avg ellipse for offense
-      if (pctStr !== '0') {
-        const model   = ellipseModelMap[cat.rate + '+' + cat.eff];
-        const seasAvg = ellipseData.off_avgs[team];
-        if (model && seasAvg && isNumeric(seasAvg[cat.rate]) && isNumeric(seasAvg[cat.eff])) {
-          const scale = model.scales[pctStr];
-          if (scale !== undefined) {
-            const {x, y} = ellipseXY([seasAvg[cat.rate], seasAvg[cat.eff]], model.eigenvals, model.eigenvecs, scale);
-            traces.push({x, y, mode:'lines', type:'scatter', line:{color:cat.color,width:1.5}, showlegend:false, hoverinfo:'skip'});
-          }
+    sides.forEach(({key, rows, hollow, sideLabel}) => {
+      const lg = cat.label + '_' + key;
+      const legendName = (showOff && showDef) ? cat.label+' ('+sideLabel+')' : cat.label;
+      const validRows = rows.filter(r => isNumeric(r[cat.rate]) && isNumeric(r[cat.eff]));
+      if (!validRows.length) return;
+
+      const rVals = validRows.map(r => r[cat.rate]);
+      const eVals = validRows.map(r => r[cat.eff]);
+      const meanR = rVals.reduce((a,b)=>a+b,0)/rVals.length;
+      const meanE = eVals.reduce((a,b)=>a+b,0)/eVals.length;
+      allX.push(...rVals); allY.push(...eVals);
+
+      // Coverage ellipse (axis-aligned, per-team fit on game data)
+      if (pctStr !== '0' && validRows.length >= 3) {
+        const stdR = Math.sqrt(rVals.reduce((s,v)=>s+(v-meanR)**2,0)/(rVals.length-1));
+        const stdE = Math.sqrt(eVals.reduce((s,v)=>s+(v-meanE)**2,0)/(eVals.length-1));
+        if (stdR > 0 && stdE > 0) {
+          const {x, y} = axisEllipseXY(meanR, meanE, stdR, stdE, parseFloat(pctStr));
+          traces.push({x, y, mode:'lines', type:'scatter',
+            line:{color:cat.color, width:1.5, dash:hollow?'dot':'dash'},
+            opacity:0.6, legendgroup:lg, showlegend:false, hoverinfo:'skip'});
         }
       }
-    }
 
-    if (showDef) {
-      const xs=[], ys=[], texts=[], cols=[];
-      defGames.forEach(r => {
-        if (!isNumeric(r[cat.rate]) || !isNumeric(r[cat.eff])) return;
-        const wl = (r.result || '?')[0]; // opponent's result
-        xs.push(r[cat.rate]); ys.push(r[cat.eff]);
-        texts.push(r.date + ' ' + r.team + ' (' + r.result + ')');
-        // opponent W = team's defense allowed a win → hollow (bad)
-        cols.push(wl === 'W' ? 'white' : cat.color);
-      });
-      if (xs.length) traces.push({
-        x:xs, y:ys, mode:'markers', type:'scatter',
-        marker:{size:9, symbol:cat.symbol, color:cols, opacity:0.7, line:{width:2, color:cat.color}},
-        name:cat.label + (showOff ? ' def' : ''),
-        legendgroup:cat.label + '_def', showlegend:true,
-        text:texts,
-        hovertemplate:'<b>%{text}</b><br>' + cat.label + ' (opp)<br>Rate: %{x:.1f}<br>Eff: %{y:.3f}<extra></extra>',
-      });
-
-      // Season-avg ellipse for defense (what opponents produced)
-      if (pctStr !== '0') {
-        const model  = ellipseModelMap[cat.rate + '+' + cat.eff];
-        const defAvg = ellipseData.def_avgs[team];
-        if (model && defAvg && isNumeric(defAvg[cat.rate]) && isNumeric(defAvg[cat.eff])) {
-          const scale = model.scales[pctStr];
-          if (scale !== undefined) {
-            const {x, y} = ellipseXY([defAvg[cat.rate], defAvg[cat.eff]], model.eigenvals, model.eigenvecs, scale);
-            traces.push({x, y, mode:'lines', type:'scatter', line:{color:cat.color,width:1.5,dash:'dash'}, showlegend:false, hoverinfo:'skip'});
-          }
-        }
+      // Game dots
+      if (showGames) {
+        const xs=[], ys=[], customdata=[], colors=[];
+        const pctDiv = cat.pct_divisor;
+        validRows.forEach(r => {
+          const wl = (r.result||'?')[0];
+          xs.push(r[cat.rate]); ys.push(r[cat.eff]);
+          // filled = W for offense, L (opponent W) = bad for defense
+          const isFilled = hollow ? wl!=='W' : wl==='W';
+          colors.push(isFilled ? cat.color : 'white');
+          const pts100 = (r[cat.rate]*r[cat.eff]).toFixed(1);
+          const effPct = pctDiv ? ' ('+(r[cat.eff]/pctDiv*100).toFixed(1)+'%)' : '';
+          const locStr = r.is_home ? 'vs' : '@';
+          customdata.push([r.date, r.result, r.poss, effPct, pts100, r.opp, locStr, r.game_id]);
+        });
+        traces.push({
+          x:xs, y:ys, mode:'markers', type:'scatter',
+          marker:{size:8, symbol:cat.symbol, color:colors, line:{width:hollow?2:0.8, color:hollow?cat.color:'black'}, opacity:0.45},
+          name:legendName, legendgroup:lg, showlegend:true,
+          customdata,
+          hovertemplate:'<b>'+team+' '+sideLabel+' \u2014 '+cat.label+'</b><br>'
+            +'%{customdata[0]}  %{customdata[1]} [%{customdata[2]} poss]<br>'
+            +'Rate: %{x:.1f}/100<br>'
+            +'Efficiency: %{y:.3f}%{customdata[3]}<br>'
+            +'Pts/100: %{customdata[4]}<extra></extra>',
+        });
       }
-    }
+
+      // Season average marker
+      const offRanks = gameLogData.off_ranks || {};
+      const defRanks = gameLogData.def_ranks || {};
+      const p100Ranks = key==='off' ? (gameLogData.off_p100_ranks||{}) : (gameLogData.def_p100_ranks||{});
+      const rankDf = key==='off' ? offRanks : defRanks;
+      const rRank = (rankDf[team]||{})[cat.rate];
+      const eRank = (rankDf[team]||{})[cat.eff];
+      const p100key = cat.rate+'+'+cat.eff;
+      const p100Rank = (p100Ranks[p100key]||{})[team];
+      const rRankStr = rRank ? '[#'+rRank+'/'+N+']' : '';
+      const eRankStr = eRank ? '[#'+eRank+'/'+N+']' : '';
+      const pRankStr = p100Rank ? '[#'+p100Rank+'/'+N+']' : '';
+      const pctDiv = cat.pct_divisor;
+      const avgEffPct = pctDiv ? ' ('+(meanE/pctDiv*100).toFixed(1)+'%)' : '';
+      const short = cat.label.split(' ')[0];
+      traces.push({
+        x:[meanR], y:[meanE], mode:'markers+text', type:'scatter',
+        marker:{size:14, symbol:cat.symbol, color:hollow?'white':cat.color,
+                line:{width:2, color:hollow?cat.color:'black'}, opacity:1},
+        text:[short], textposition:'top center', textfont:{size:9, color:cat.color},
+        name:legendName+' avg', legendgroup:lg, showlegend:false,
+        hovertemplate:'<b>'+team+' '+sideLabel+' avg \u2014 '+cat.label+'</b> ('+validRows.length+'g)<br>'
+          +'Rate: '+meanR.toFixed(1)+'/100  '+rRankStr+'<br>'
+          +'Efficiency: '+meanE.toFixed(3)+avgEffPct+'  '+eRankStr+'<br>'
+          +'Pts/100: '+(meanR*meanE).toFixed(1)+'  '+pRankStr+'<extra></extra>',
+      });
+    });
   });
+
+  const contour = buildContourTraces(allX, allY);
 
   // Rank annotation
-  const annLines = ['<b>' + team + ' Season Ranks</b>'];
+  const annLines = ['<b>'+team+' Season Ranks</b>'];
   activeCats.forEach(cat => {
-    const key  = cat.rate + '+' + cat.eff;
-    const op   = ((gameLogData.off_p100_ranks || {})[key] || {})[team];
-    const dp   = ((gameLogData.def_p100_ranks || {})[key] || {})[team];
-    const short = (ELLIPSE_SHORT[cat.label] || cat.label).padStart(7).replace(/ /g, '\u00a0');
+    const key  = cat.rate+'+'+cat.eff;
+    const op   = ((gameLogData.off_p100_ranks||{})[key]||{})[team];
+    const dp   = ((gameLogData.def_p100_ranks||{})[key]||{})[team];
+    const short = (ELLIPSE_SHORT[cat.label]||cat.label).padStart(7).replace(/ /g,'\u00a0');
     const parts = [];
-    if (op) parts.push('Off\u00a0#' + op);
-    if (dp) parts.push('Def\u00a0#' + dp);
-    if (parts.length) annLines.push(short + ': ' + parts.join(' '));
+    if (op) parts.push('Off\u00a0#'+op);
+    if (dp) parts.push('Def\u00a0#'+dp);
+    if (parts.length) annLines.push(short+': '+parts.join(' '));
   });
-
   const annotations = [];
   if (annLines.length > 1)
-    annotations.push({text:annLines.join('<br>'), xref:'paper', yref:'paper', x:0.98, y:0.98, xanchor:'right', yanchor:'top', showarrow:false, font:{size:11, family:'monospace'}, align:'left', bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#ccc', borderwidth:1, borderpad:6});
+    annotations.push({text:annLines.join('<br>'), xref:'paper', yref:'paper', x:0.98, y:0.98,
+      xanchor:'right', yanchor:'top', showarrow:false,
+      font:{size:11, family:'monospace'}, align:'left',
+      bgcolor:'rgba(255,255,255,0.85)', bordercolor:'#ccc', borderwidth:1, borderpad:6});
 
-  const sideLabel = side === 'off' ? 'Offense' : side === 'def' ? 'Defense' : 'Both';
-  Plotly.react('gamelog-chart', traces, {
-    title: team + ' Game Log \u2014 ' + sideLabel,
-    xaxis:{title:'Rate (per 100 possessions)', showgrid:true, gridcolor:'lightgray'},
-    yaxis:{title:'Efficiency (pts per event)', showgrid:true, gridcolor:'lightgray'},
-    height:700, width:1100, showlegend:true,
-    legend:{x:1.02, y:1, yanchor:'top'},
-    margin:{l:60, r:160, t:60, b:60},
-    plot_bgcolor:'white', paper_bgcolor:'#fafafa', annotations,
+  const sideLabel = side==='off'?'Offense':side==='def'?'Defense':'Both';
+  const el = document.getElementById('gamelog-chart');
+  Plotly.react('gamelog-chart', contour.traces.concat(traces), {
+    title:{text:team+' \u2014 per-game Rate vs Efficiency'
+      +'<span style="font-size:12px;color:gray"> (contours = pts contributed / 100 poss)</span>',
+      font:{size:15}},
+    xaxis:{title:'Per 100 Possessions', showgrid:true, gridcolor:'lightgray', zeroline:false},
+    yaxis:{title:'Points Per Event', showgrid:true, gridcolor:'lightgray', zeroline:false},
+    height:700, showlegend:true,
+    legend:{orientation:'h', yanchor:'top', y:-0.12, xanchor:'center', x:0.5},
+    margin:{l:60, r:60, t:60, b:120},
+    plot_bgcolor:'white', paper_bgcolor:'#fafafa',
+    annotations:annotations.concat(contour.annotations),
   }, {displayModeBar:false});
+
+  // Click-to-pin
+  el.removeEventListener('plotly_click', el._gameLogClick||null);
+  el._gameLogClick = function(d) {
+    if (!d || !d.points || !d.points[0]) return;
+    const pt = d.points[0];
+    const cd = pt.customdata;
+    if (!cd || !cd[7]) return; // not a game dot (no game_id)
+    const gameId = cd[7];
+    if (_gameLogPinnedId === gameId) {
+      _gameLogPinnedId = null;
+      document.getElementById('gamelog-game-select').value = '';
+      document.getElementById('gamelog-pinned-label').textContent = '';
+    } else {
+      _gameLogPinnedId = gameId;
+      document.getElementById('gamelog-game-select').value = gameId;
+      document.getElementById('gamelog-pinned-label').textContent =
+        'Pinned: ' + cd[0] + '  ' + cd[6] + ' ' + cd[5] + '  ' + cd[1];
+    }
+  };
+  el.on('plotly_click', el._gameLogClick);
 }
 
 /* ===================================================================
@@ -1186,8 +1477,12 @@ async function init() {
   matchupAway.addEventListener('change', updateMatchupChart);
   matchupHome.addEventListener('change', updateMatchupChart);
   document.querySelectorAll('input[name="matchup-pct"]').forEach(r => r.addEventListener('change', updateMatchupChart));
+  document.querySelectorAll('input[name="matchup-avg"]').forEach(r => r.addEventListener('change', updateMatchupChart));
+  document.getElementById('matchup-show-center').addEventListener('change', updateMatchupChart);
+  document.getElementById('matchup-show-delta').addEventListener('change', updateMatchupChart);
+  document.getElementById('matchup-show-games').addEventListener('change', updateMatchupChart);
 
-  // Game log dropdown
+  // Game log team dropdown
   const gameLogTeams = [...new Set(gameLogData.games.map(r => r.team))].sort();
   const gameLogSel   = document.getElementById('gamelog-team');
   gameLogTeams.forEach(t => {
@@ -1196,9 +1491,40 @@ async function init() {
     gameLogSel.appendChild(opt);
   });
   gameLogSel.value = gameLogTeams.includes('GSW') ? 'GSW' : gameLogTeams[0];
-  gameLogSel.addEventListener('change', updateGameLogChart);
+
+  // Populate game-select dropdown and re-populate on team change
+  function populateGameSelect(team) {
+    const sel = document.getElementById('gamelog-game-select');
+    sel.innerHTML = '<option value="">Select or click a game\u2026</option>';
+    _gameLogPinnedId = null;
+    document.getElementById('gamelog-pinned-label').textContent = '';
+    const games = gameLogData.games.filter(r => r.team === team)
+      .sort((a,b) => a.game_id < b.game_id ? 1 : -1); // newest first
+    games.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.game_id;
+      const loc = r.is_home ? 'vs' : '@';
+      opt.textContent = r.date + '  ' + (r.result||'') + ' ' + loc + ' ' + r.opp;
+      sel.appendChild(opt);
+    });
+  }
+  populateGameSelect(gameLogSel.value);
+
+  gameLogSel.addEventListener('change', () => {
+    populateGameSelect(gameLogSel.value);
+    updateGameLogChart();
+  });
+  document.getElementById('gamelog-game-select').addEventListener('change', function() {
+    const gid = this.value;
+    if (!gid) { _gameLogPinnedId = null; document.getElementById('gamelog-pinned-label').textContent = ''; return; }
+    _gameLogPinnedId = gid;
+    const r = gameLogData.games.find(g => g.game_id === gid && g.team === gameLogSel.value);
+    if (r) document.getElementById('gamelog-pinned-label').textContent =
+      'Pinned: ' + r.date + '  ' + (r.result||'') + ' ' + (r.is_home?'vs':'@') + ' ' + r.opp;
+  });
   document.querySelectorAll('input[name="gamelog-side"]').forEach(r => r.addEventListener('change', updateGameLogChart));
   document.querySelectorAll('input[name="gamelog-pct"]').forEach(r => r.addEventListener('change', updateGameLogChart));
+  document.getElementById('gamelog-show-games').addEventListener('change', updateGameLogChart);
 
   // Initial renders
   updateSeasonChart();
