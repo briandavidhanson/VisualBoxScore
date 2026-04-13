@@ -997,6 +997,7 @@ function updateMatchupChart() {
       }
 
       // Offensive ghost (season avg for attacker)
+      const lib   = !!cat.lower_is_better;
       const offAvg = ellipseData.off_avgs[off];
       if (showOffGhost && offAvg && isNumeric(offAvg[cat.rate]) && isNumeric(offAvg[cat.eff])) {
         const sAvg = [offAvg[cat.rate], offAvg[cat.eff]];
@@ -1007,7 +1008,6 @@ function updateMatchupChart() {
           const effStr = pctD ? sAvg[1].toFixed(3)+' ('+(sAvg[1]/pctD*100).toFixed(1)+'%)' : sAvg[1].toFixed(3);
           const oRks  = gameLogData ? (gameLogData.off_ranks||{}) : {};
           const oP100 = gameLogData ? (gameLogData.off_p100_ranks||{}) : {};
-          const lib   = !!cat.lower_is_better;
           const rRkO  = fmtRk((oRks[off]||{})[cat.rate], false, lib);
           const eRkO  = fmtRk((oRks[off]||{})[cat.eff],  false, lib);
           const pRkO  = fmtRk((oP100[cat.rate+'+'+cat.eff]||{})[off], false, lib);
