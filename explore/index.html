@@ -926,8 +926,13 @@ function updateMatchupChart() {
   const traces = [], layoutAnnotations = [], predAway = {}, predHome = {};
   const allX = [], allY = [];
   const Nm = (ellipseData.teams||[]).length || 30;
-  // fmtRk: format rank string; isD=true flips defense ranks to best=1 convention
-  const fmtRk = (r, isD) => r ? ' [#'+(isD ? Nm+1-r : r)+'/'+Nm+']' : '';
+  // fmtRk: flip when (defense && !lowerIsBetter) || (offense && lowerIsBetter)
+  // i.e. shouldFlip = isD XOR lib — ensures best=1 convention for all categories
+  const fmtRk = (r, isD, lib) => {
+    if (!r) return '';
+    const flip = (isD && !lib) || (!isD && !!lib);
+    return ' [#'+(flip ? Nm+1-r : r)+'/'+Nm+']';
+  };
 
   // Away attacks Home (hollow/dotted), Home attacks Away (filled/solid)
   const attackers = [
@@ -1002,9 +1007,10 @@ function updateMatchupChart() {
           const effStr = pctD ? sAvg[1].toFixed(3)+' ('+(sAvg[1]/pctD*100).toFixed(1)+'%)' : sAvg[1].toFixed(3);
           const oRks  = gameLogData ? (gameLogData.off_ranks||{}) : {};
           const oP100 = gameLogData ? (gameLogData.off_p100_ranks||{}) : {};
-          const rRkO  = fmtRk((oRks[off]||{})[cat.rate], false);
-          const eRkO  = fmtRk((oRks[off]||{})[cat.eff],  false);
-          const pRkO  = fmtRk((oP100[cat.rate+'+'+cat.eff]||{})[off], false);
+          const lib   = !!cat.lower_is_better;
+          const rRkO  = fmtRk((oRks[off]||{})[cat.rate], false, lib);
+          const eRkO  = fmtRk((oRks[off]||{})[cat.eff],  false, lib);
+          const pRkO  = fmtRk((oP100[cat.rate+'+'+cat.eff]||{})[off], false, lib);
           traces.push({
             x:[sAvg[0]], y:[sAvg[1]], mode:'markers', type:'scatter',
             marker:{size:10, symbol:cat.symbol, color:'white', line:{width:2,color:cat.color}, opacity:0.35},
@@ -1032,9 +1038,9 @@ function updateMatchupChart() {
           const dEffStr = pctD ? dAvg[1].toFixed(3)+' ('+(dAvg[1]/pctD*100).toFixed(1)+'%)' : dAvg[1].toFixed(3);
           const dRks  = gameLogData ? (gameLogData.def_ranks||{}) : {};
           const dP100 = gameLogData ? (gameLogData.def_p100_ranks||{}) : {};
-          const rRkD  = fmtRk((dRks[def]||{})[cat.rate], true);
-          const eRkD  = fmtRk((dRks[def]||{})[cat.eff],  true);
-          const pRkD  = fmtRk((dP100[cat.rate+'+'+cat.eff]||{})[def], true);
+          const rRkD  = fmtRk((dRks[def]||{})[cat.rate], true, lib);
+          const eRkD  = fmtRk((dRks[def]||{})[cat.eff],  true, lib);
+          const pRkD  = fmtRk((dP100[cat.rate+'+'+cat.eff]||{})[def], true, lib);
           traces.push({
             x:[dAvg[0]], y:[dAvg[1]], mode:'markers', type:'scatter',
             marker:{size:8, symbol:cat.symbol, color:'white', line:{width:2,color:cat.color}, opacity:0.22},
@@ -1316,8 +1322,13 @@ function updateGameLogChart() {
       const defRanks = gameLogData.def_ranks || {};
       const p100Ranks = key==='off' ? (gameLogData.off_p100_ranks||{}) : (gameLogData.def_p100_ranks||{});
       const rankDf = key==='off' ? offRanks : defRanks;
-      // Defense ranks stored ascending=False (1=most allowed=worst); flip so 1=best
-      const flipR = r => (r && key==='def') ? N+1-r : r;
+      // Flip when (defense && !lowerIsBetter) || (offense && lowerIsBetter)
+      const _lib = !!cat.lower_is_better;
+      const flipR = r => {
+        if (!r) return r;
+        const flip = (key==='def' && !_lib) || (key==='off' && _lib);
+        return flip ? N+1-r : r;
+      };
       const rRank    = flipR((rankDf[team]||{})[cat.rate]);
       const eRank    = flipR((rankDf[team]||{})[cat.eff]);
       const p100key  = cat.rate+'+'+cat.eff;
@@ -1361,9 +1372,12 @@ function updateGameLogChart() {
   const annLines = ['<b>'+team+' Season Ranks</b>'];
   activeCats.forEach(cat => {
     const key  = cat.rate+'+'+cat.eff;
-    const op   = ((gameLogData.off_p100_ranks||{})[key]||{})[team];
-    const dpRaw = ((gameLogData.def_p100_ranks||{})[key]||{})[team];
-    const dp   = dpRaw ? N+1-dpRaw : dpRaw;  // flip: raw 1=worst, display 1=best
+    const annLib = !!cat.lower_is_better;
+    const opRaw  = ((gameLogData.off_p100_ranks||{})[key]||{})[team];
+    const dpRaw  = ((gameLogData.def_p100_ranks||{})[key]||{})[team];
+    // flip = isD XOR lib
+    const op = opRaw ? (annLib ? N+1-opRaw : opRaw) : null;
+    const dp = dpRaw ? (annLib ? dpRaw : N+1-dpRaw) : null;
     const short = (ELLIPSE_SHORT[cat.label]||cat.label).padStart(7).replace(/ /g,'\u00a0');
     const parts = [];
     if (op) parts.push('Off\u00a0#'+op);
