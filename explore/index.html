@@ -711,7 +711,7 @@ function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
       });
       const name = isBoth ? cat.label + ' (' + sideLabel + ')' : cat.label;
       const markerOpts = {symbol: cat.symbol, size: 12, color: cat.color, line:{width:1, color:'black'}};
-      if (isBoth && prefix === 'opp_') {
+      if (prefix === 'opp_') {
         markerOpts.color = 'white';
         markerOpts.line = {width: 2, color: cat.color};
       }
