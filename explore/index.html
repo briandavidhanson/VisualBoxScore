@@ -644,7 +644,6 @@ function getEffValues(data, cat, prefix) {
 }
 
 function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
-  const shapes = [];
   const isBoth = prefixes.length === 2;
   let titleSide;
   if (isBoth) titleSide = 'Offense & Defense';
@@ -726,11 +725,16 @@ function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
 
       if (showAvg && x.length) {
         const avgX = mean(x), avgY = mean(y);
-        shapes.push(
-          {type:'line', xref:'x', yref:'paper', x0:avgX, x1:avgX, y0:0, y1:1,
-           line:{dash:'dot', color:cat.color, width:1}, opacity:0.4},
-          {type:'line', xref:'paper', yref:'y', x0:0, x1:1, y0:avgY, y1:avgY,
-           line:{dash:'dot', color:cat.color, width:1}, opacity:0.4},
+        const xMin = Math.min(...x), xMax = Math.max(...x);
+        const yMin = Math.min(...y), yMax = Math.max(...y);
+        const grp = isBoth ? cat.label + '_' + prefix : cat.label;
+        traces.push(
+          {x:[avgX,avgX], y:[yMin,yMax], mode:'lines', type:'scatter',
+           line:{dash:'dot', color:cat.color, width:1.5}, opacity:0.5,
+           showlegend:false, hoverinfo:'skip', legendgroup:grp},
+          {x:[xMin,xMax], y:[avgY,avgY], mode:'lines', type:'scatter',
+           line:{dash:'dot', color:cat.color, width:1.5}, opacity:0.5,
+           showlegend:false, hoverinfo:'skip', legendgroup:grp},
         );
       }
     });
@@ -765,7 +769,6 @@ function buildUnfaceted(data, categories, prefixes, showAvg, connectDots) {
     legend:{yanchor:'top', y:0.99, xanchor:'left', x:1.02},
     margin:{l:60, r:160, t:40, b:60},
     plot_bgcolor:'white', paper_bgcolor:'#fafafa',
-    shapes: shapes,
     annotations: contour.annotations,
   };
   Plotly.react('rate-chart', traces, layout, {displayModeBar: false});
