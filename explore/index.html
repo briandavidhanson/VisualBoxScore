@@ -291,10 +291,10 @@ const PLAYER_EXCLUDE = new Set([
    CATEGORY DEFINITIONS (Rate vs Efficiency)
    =================================================================== */
 const SHOT_CATEGORIES = [
-  {label:'Close (\u22645ft)', rate:'close_freq', eff:'close_pps', eff_num:null, eff_den:null, color:'green', symbol:'circle'},
-  {label:'Mid-Range', rate:'mid_freq', eff:'mid_pps', eff_num:null, eff_den:null, color:'blue', symbol:'square'},
-  {label:'3-Pointer', rate:'three_freq', eff:'three_pps', eff_num:null, eff_den:null, color:'red', symbol:'triangle-up'},
-  {label:'FT Trip', rate:'ft_trip_freq', eff:'ft_ppt', eff_num:null, eff_den:null, color:'purple', symbol:'diamond'},
+  {label:'Close (\u22645ft)', rate:'close_freq', eff:'close_pps', eff_num:null, eff_den:null, color:'green',  symbol:'circle',      is_scoring:true, pct_divisor:2},
+  {label:'Mid-Range',         rate:'mid_freq',   eff:'mid_pps',   eff_num:null, eff_den:null, color:'blue',   symbol:'square',      is_scoring:true, pct_divisor:2},
+  {label:'3-Pointer',         rate:'three_freq', eff:'three_pps', eff_num:null, eff_den:null, color:'red',    symbol:'triangle-up', is_scoring:true, pct_divisor:3},
+  {label:'FT Trip',           rate:'ft_trip_freq',eff:'ft_ppt',   eff_num:null, eff_den:null, color:'purple', symbol:'diamond',     is_scoring:true, pct_divisor:2},
 ];
 const EXTRA_CATEGORIES = [
   {label:'Steals', rate:'stl_per100', eff:null, eff_num:'stl_pts', eff_den:'stl', color:'orange', symbol:'star'},
