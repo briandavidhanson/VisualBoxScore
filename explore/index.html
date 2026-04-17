@@ -351,7 +351,7 @@ function friendlySeason(col) {
 }
 
 function friendlyPlayer(col) {
-  const overrides = {'pm': '+/\u2212', 'pm_per100': '+/\u2212 /100'};
+  const overrides = {'pm': '+/\u2212', 'pm_per100': '+/\u2212 /100', 'pm_net': 'On-Off +/\u2212'};
   if (overrides[col]) return overrides[col];
   let label = col.replace(/_/g, ' ').replace(/pct/g, '%').replace(/per100/g, '/100').replace(/per game/g, '/G');
   return label.replace(/\b\w/g, c => c.toUpperCase());
