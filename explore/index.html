@@ -298,11 +298,11 @@ const SHOT_CATEGORIES = [
 ];
 const EXTRA_CATEGORIES = [
   {label:'Steals', rate:'stl_per100', eff:null, eff_num:'stl_pts', eff_den:'stl', color:'orange', symbol:'star'},
-  {label:'Turnovers', rate:'tov_per100', eff:null, eff_num:'tov_pts', eff_den:'tov', color:'brown', symbol:'pentagon'},
+  {label:'Turnovers', rate:'tov_per100', eff:null, eff_num:'tov_pts', eff_den:'tov', color:'brown', symbol:'pentagon', lower_is_better:true},
   {label:'Off. Rebounds', rate:'oreb_per100', eff:null, eff_num:'orb_pts', eff_den:'oreb', color:'teal', symbol:'hexagon'},
   {label:'Assists', rate:'ast_per100', eff:null, eff_num:'ast_pts', eff_den:'ast', color:'gold', symbol:'cross'},
   {label:'Blocks', rate:'blk_per100', eff:null, eff_num:null, eff_den:null, color:'gray', symbol:'bowtie'},
-  {label:'Fouls', rate:'pf_per100', eff:null, eff_num:'pf_pts', eff_den:'pf', color:'hotpink', symbol:'hourglass'},
+  {label:'Fouls', rate:'pf_per100', eff:null, eff_num:'pf_pts', eff_den:'pf', color:'hotpink', symbol:'hourglass', lower_is_better:true},
   {label:'Fast Break', rate:'fb_poss_per100', eff:null, eff_num:'fb_pts', eff_den:'fb_poss', color:'cyan', symbol:'triangle-down'},
   {label:'Chances', rate:'chances_freq', eff:'chances_pps', eff_num:null, eff_den:null, color:'slategray', symbol:'asterisk'},
   {label:'Clutch', rate:'clutch_poss_per100', eff:null, eff_num:'clutch_pts', eff_den:'clutch_poss', color:'darkred', symbol:'triangle-left'},
