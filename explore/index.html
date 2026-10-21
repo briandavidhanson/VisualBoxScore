@@ -21,6 +21,15 @@ h1 {
   font-weight: 600;
   margin-bottom: 16px;
 }
+.season-banner {
+  display: inline-block;
+  margin: -6px 0 16px;
+  padding: 6px 12px;
+  border-left: 4px solid #16213e;
+  background: #eef1f7;
+  color: #16213e;
+  font-size: 14px;
+}
 .tab-bar {
   display: flex;
   border-bottom: 2px solid #16213e;
@@ -101,6 +110,7 @@ h1 {
 <body>
 <div class="container">
   <h1>NBA Stats Explorers</h1>
+  <div id="season-banner" class="season-banner"><strong>2025–26 season</strong> — all tabs show last season's data (regular season + playoffs).</div>
 
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="season">Season Explorer</button>
@@ -1541,6 +1551,19 @@ async function init() {
   playerData  = await playerResp.json();
   ellipseData = await ellipseResp.json();
   gameLogData = await gameLogResp.json();
+
+  // Season banner follows the exported data window
+  const season = ellipseData.season;
+  if (season) {
+    const label = season.label.replace('-', '\u2013');
+    const startYr = parseInt(season.label, 10);
+    const current = new Date() < new Date(`${startYr + 1}-08-01`);
+    document.getElementById('season-banner').innerHTML = current
+      ? `<strong>${label} season</strong> \u2014 ${season.games} games so far`
+      : `<strong>${label} season</strong> \u2014 all tabs show last season's data `
+        + `(${season.games} games, regular season + playoffs). `
+        + `${startYr + 1}\u2013${String(startYr + 2).slice(2)} stats will appear once more games have been played.`;
+  }
 
   // Build ellipseModelMap
   (ellipseData.categories || []).forEach(cat => {
